@@ -123,7 +123,9 @@ export class CostManager {
   }
 
   limitsFor(provider) {
-    return this.limits[provider] || { tier: TIER.PREMIUM, unitCostUsd: 0, freeUnitsPerMonth: 0, dailyUnits: 0, monthlyUnits: 0 };
+    if (this.limits[provider]) return this.limits[provider];
+    if (provider.startsWith('rapidapi-')) return this.limits['rapidapi'];
+    return { tier: TIER.PREMIUM, unitCostUsd: 0, freeUnitsPerMonth: 0, dailyUnits: 0, monthlyUnits: 0 };
   }
 
   mode() {
