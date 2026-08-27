@@ -86,6 +86,8 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       passwordSet,
       locked: passwordSet && !authed,
       profiles: authed ? profiles : [],
+      pollOnStartup: cfg.pollOnStartup !== false,
+
       intervalHours: cfg.intervalHours || config.pollIntervalHours,
       batchIntervalHours: config.batchIntervalHours,
       privacyPing: true,
@@ -357,6 +359,8 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       if (startDate !== undefined) cfg.providerLimits[provider].startDate = startDate;
       if (endDate !== undefined) cfg.providerLimits[provider].endDate = endDate;
       store.setConfig({ providerLimits: cfg.providerLimits });
+      ...(typeof req.body.pollOnStartup === "boolean" ? { pollOnStartup: req.body.pollOnStartup } : {}),
+
 
       if (currentUsage !== undefined) {
         stack.costManager.repo.update((doc) => {
@@ -475,6 +479,8 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       store.mute(() => {
         const cfg = store.getConfig();
         store.setConfig({
+      ...(typeof req.body.pollOnStartup === "boolean" ? { pollOnStartup: req.body.pollOnStartup } : {}),
+
           hfLastUploadAt: r.ok ? new Date().toISOString() : cfg.hfLastUploadAt || null,
           hfLastError: r.ok ? null : (r.errors || []).join('; ') || null,
         });

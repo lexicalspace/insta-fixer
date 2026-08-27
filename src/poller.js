@@ -137,8 +137,14 @@ export function schedule(config, store, options = {}) {
     });
   };
 
-  // Run immediately on startup so we don't sleep through missed polls
-  setTimeout(run, 5000); 
+  // Run immediately on startup if configured (defaults to true)
+  const cfg = store.getConfig();
+  if (cfg.pollOnStartup !== false) {
+    setTimeout(run, 5000);
+  } else {
+    console.log("[poller] Skipping immediate poll on startup (pollOnStartup=false). Next poll scheduled.");
+  }
+
 
   const timer = setInterval(run, ms);
   if (timer.unref && !options.keepAlive) timer.unref();

@@ -1050,6 +1050,11 @@ async function renderConfigPage() {
         <button id="interval-save" class="btn-pill btn-secondary">Save interval</button>
         <span class="text-xs text-[#8e8e93]">Private accounts are privacy-pinged hourly (cheap, batched) and fully checked every ${s.batchIntervalHours} hour(s) unless overridden per profile. If one goes public it is pulled immediately and you get a Telegram alert.</span>
       </div>
+      <div class="mt-4 flex items-center gap-2">
+        <input type="checkbox" id="poll-startup-check" class="h-4 w-4 rounded border-[#eaecf0] dark:border-[#2a3441] text-[#1ba673] focus:ring-[#1ba673]" ${s.pollOnStartup ? "checked" : ""}>
+        <label for="poll-startup-check" class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0]">Run poll immediately on app restart</label>
+
+      </div>
     </section>
 
     <section class="card p-6 mb-6">
@@ -1106,7 +1111,7 @@ async function renderConfigPage() {
 
   $('#interval-save').addEventListener('click', async () => {
     try {
-      const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ intervalHours: Number($('#interval-input').value) }) });
+      const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ intervalHours: Number($('#interval-input').value), pollOnStartup: $('#poll-startup-check').checked }) });
       status.intervalHours = r.intervalHours;
       await refresh();
 
