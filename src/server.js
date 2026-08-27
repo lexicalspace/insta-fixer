@@ -252,8 +252,17 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     if (updated === false) return res.status(400).json({ error: `"${newUsername}" is already tracked.` });
     if (hfEnabled(config)) {
       try {
-        await deleteFromHF(config, store, oldUsername);
+        const manifest = store.getHfManifest();
+        const oldPaths = Object.keys(manifest[oldUsername] || {}).map((rel) => `${oldUsername}/${rel}`);
+        const extraOps = oldPaths.map(p => ({ isDelete: true, path: p, user: oldUsername }));
+        if (manifest[oldUsername]) {
+          delete manifest[oldUsername];
+          store.setHfManifest(manifest);
+        }
+
         await syncToHF(store, config);
+
+
       } catch (err) {
         console.warn(`[hf] rename sync failed: ${err.message}`);
       }
@@ -261,21 +270,25 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     res.json({ ok: true, username: newUsername, profile: updated });
   });
 
-  app.delete('/api/config/profiles/:username', requireAuth, async (req, res) => {
+  app.delete("/api/config/profiles/:username", requireAuth, async (req, res) => {
     const username = normalizeUsername(req.params.username);
     if (!username) {
-      return res.status(400).json({ error: 'Invalid Instagram username.' });
+      return res.status(400).json({ error: "Invalid Instagram username." });
     }
     store.removeProfile(username);
     if (hfEnabled(config)) {
       try {
-        await deleteFromHF(config, store, username);
+        // Do not delete from HF so the data can be recovered if added back
+        await syncToHF(store, config);
+
+
       } catch (err) {
         console.warn(`[hf] delete sync failed: ${err.message}`);
       }
     }
     res.json({ ok: true, username, profiles: store.getProfiles() });
   });
+
 
   /**
    * The cron endpoint. One hit performs the entire cycle in-request —
@@ -455,7 +468,9 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       return res.status(400).json({ error: 'HF not configured. Set HF_TOKEN and HF_DATASET.' });
     }
     try {
-      const r = await syncToHF(store, config);
+        await syncToHF(store, config);
+
+
       store.mute(() => {
         const cfg = store.getConfig();
         store.setConfig({

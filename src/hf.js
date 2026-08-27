@@ -127,34 +127,46 @@ function chunkOperations(ops) {
   let cur = [];
   let size = 0;
   for (const o of ops) {
-    if (cur.length && (size + o.buf.length > BATCH_MAX_BYTES || cur.length >= BATCH_MAX_OPS)) {
+    const oSize = o.buf ? o.buf.length : 0;
+    if (cur.length && (size + oSize > BATCH_MAX_BYTES || cur.length >= BATCH_MAX_OPS)) {
+
       batches.push(cur);
       cur = [];
       size = 0;
     }
     cur.push(o);
-    size += o.buf.length;
+    size += oSize;
+
   }
   if (cur.length) batches.push(cur);
   return batches;
 }
 
 async function commitBatch(config, batch, title) {
-  const info = batch.map((o) => ({ path: o.path, ...fileInfo(o.buf) }));
-  const meta = await preupload(config, info);
+  const uploadOps = batch.filter(o => !o.isDelete);
+  const info = uploadOps.map((o) => ({ path: o.path, ...fileInfo(o.buf) }));
+  let meta = { files: [] };
+  if (info.length) meta = await preupload(config, info);
   const entries = [];
-  for (const item of meta.files) {
-    const op = batch.find((o) => o.path === item.path);
-    if (item.shouldIgnore) continue; // identical content already at this path
-    if (item.uploadMode === 'lfs') {
+  for (const op of batch) {
+    if (op.isDelete) {
+      entries.push({ key: "deletedFile", value: { path: op.path } });
+      continue;
+    }
+    const item = meta.files.find((f) => f.path === op.path);
+    if (!item) continue;
+    if (item.shouldIgnore) continue;
+    if (item.uploadMode === "lfs") {
       const fi = fileInfo(op.buf);
       await lfsUpload(config, fi.sha256, op.buf);
-      entries.push({ key: 'lfsFile', value: { path: op.path, algo: 'sha256', oid: fi.sha256, size: fi.size } });
+      entries.push({ key: "lfsFile", value: { path: op.path, algo: "sha256", oid: fi.sha256, size: fi.size } });
     } else {
-      entries.push({ key: 'file', value: { path: op.path, encoding: 'base64', content: op.buf.toString('base64') } });
+      entries.push({ key: "file", value: { path: op.path, encoding: "base64", content: op.buf.toString("base64") } });
     }
   }
   if (entries.length) await commitNDJSON(config, entries, title);
+}
+
 }
 
 /**
@@ -169,7 +181,7 @@ async function commitBatch(config, batch, title) {
  * on an ephemeral disk a redeploy would otherwise reset the month's spend to
  * zero and the budget ceiling would stop meaning anything.
  */
-export async function syncToHF(store, config) {
+export async function syncToHF(store, config, extraOps = []) {
   if (!hfEnabled(config)) return { ok: false, skipped: true, reason: 'HF not configured (HF_TOKEN + HF_DATASET)' };
   await ensureRepo(config);
 
@@ -179,7 +191,7 @@ export async function syncToHF(store, config) {
   const password = store.readJson('password.json', null);
   const usage = store.readJson('usage.json', null);
   const now = new Date().toISOString();
-  const ops = [];
+  const ops = [...extraOps];
   let toUpload = 0;
 
   const metaFiles = {
