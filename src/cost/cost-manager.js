@@ -67,10 +67,8 @@ export const DEFAULT_LIMITS = {
     monthlyUnits: 500,
   },
   /**
-   * Bright Data bills per record returned. There is no free monthly allowance,
-   * so in maximum_free mode `monthlyCeiling` resolves to 0 and the router skips
-   * it — set BRIGHTDATA_FREE_UNITS if your plan includes trial credit, or run in
-   * `balanced` mode to spend the configured paid limit.
+   * Bright Data bills per record returned (1 credit = 1 record).
+   * It provides 5,000 free credits per month that renew on the 1st.
    *
    * dailyUnits is a burst guard only and must stay above the largest legitimate
    * single day: one status record per tracked account per hourly tick.
@@ -78,7 +76,7 @@ export const DEFAULT_LIMITS = {
   brightdata: {
     tier: TIER.LOW_COST,
     unitCostUsd: 0.001,
-    freeUnitsPerMonth: 0,
+    freeUnitsPerMonth: 5000,
     dailyUnits: Math.floor(5000 / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()),
     monthlyUnits: 5000,
   },
