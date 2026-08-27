@@ -523,7 +523,7 @@ function leaderboardTable() {
             const accent = DRIVER_COLORS[i % DRIVER_COLORS.length];
             const avatar = latestAvatar(r.username);
             return `
-              <tr class="border-b border-[#f0f1f4] dark:border-[#20242e] last:border-0">
+              <tr class="border-b border-[#f0f1f4] dark:border-[#20242e] last:border-0 cursor-pointer hover:bg-[#f9fafb] dark:hover:bg-[#2a3441] transition-colors" onclick="openProfileDossier('${r.username}')" title="Click to view full dossier">
                 <td class="py-3 pr-3">${posBadge(i + 1)}</td>
                 <td class="py-3 pr-3">
                   <div class="flex items-center gap-3">
@@ -1673,3 +1673,91 @@ async function liveRefresh() {
 wireLightbox();
 render();
 setInterval(liveRefresh, 15000);
+
+
+window.openProfileDossier = async (username) => {
+  let modal = $('#dossier-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'dossier-modal';
+    modal.className = 'fixed inset-0 z-50 flex flex-col bg-white dark:bg-[#1a1a1a] overflow-hidden translate-x-full transition-transform duration-300';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div class="flex items-center justify-between p-4 border-b border-[#eaecf0] dark:border-[#2a3441] bg-[#f7f8fa] dark:bg-[#1c2430]">
+      <h2 class="text-xl font-bold flex items-center gap-3">
+        ${latestAvatar(username) ? `<img src="${latestAvatar(username)}" class="w-10 h-10 rounded-full object-cover">` : ''}
+        @${escapeHtml(username)} Profile Dossier
+      </h2>
+      <button onclick="closeProfileDossier()" class="btn-pill btn-secondary">Close</button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 md:p-8" id="dossier-content">
+      <div class="flex items-center justify-center p-12"><div class="animate-pulse flex items-center gap-2"><span class="h-4 w-4 rounded-full bg-[#1ba673] block"></span> Loading dossier...</div></div>
+    </div>
+  `;
+  
+  setTimeout(() => modal.classList.remove('translate-x-full'), 10);
+  
+  try {
+    const mediaData = await api(`/api/media/user/${encodeURIComponent(username)}`);
+    
+    const snaps = ((historyData?.profiles || {})[username] || []);
+    const latestProfile = snaps.length > 0 ? snaps[snaps.length-1].profile : null;
+    
+    const currentBio = latestProfile?.biography || 'No biography tracked yet.';
+    const currentFollowers = latestProfile?.followersCount || 0;
+    const currentFollowing = latestProfile?.followsCount || 0;
+    const postsCount = latestProfile?.postsCount || 0;
+    
+    const mediaHtml = mediaData.items.map((m, i) => {
+       if (m.kind === 'story' && m.file.endsWith('.mp4')) {
+         return `<video src="${m.url}" autoplay loop muted playsinline class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox([${mediaData.items.map(x=>`'${x.url}'`).join(',')}], i)"></video>`;
+       }
+       return `<img src="${m.url}" class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox([${mediaData.items.map(x=>`'${x.url}'`).join(',')}], i)">`;
+    }).join('');
+    
+    $('#dossier-content').innerHTML = `
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+         <div class="col-span-1 md:col-span-3 card p-6 bg-gradient-to-r from-[#f9fafb] to-white dark:from-[#1c2430] dark:to-[#202835]">
+            <h3 class="text-xs font-bold text-[#8e8e93] uppercase tracking-wide mb-3">Biography</h3>
+            <p class="whitespace-pre-wrap text-[#1a1a1a] dark:text-white leading-relaxed">${escapeHtml(currentBio)}</p>
+         </div>
+         <div class="card p-6 flex flex-col justify-center gap-4">
+            <div class="flex justify-between items-center border-b border-[#eaecf0] dark:border-[#2a3441] pb-3">
+               <span class="text-[#8e8e93] text-sm">Followers</span>
+               <span class="font-bold text-lg">${currentFollowers.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-[#eaecf0] dark:border-[#2a3441] pb-3">
+               <span class="text-[#8e8e93] text-sm">Following</span>
+               <span class="font-bold text-lg">${currentFollowing.toLocaleString()}</span>
+            </div>
+            <div class="flex justify-between items-center">
+               <span class="text-[#8e8e93] text-sm">Posts</span>
+               <span class="font-bold text-lg">${postsCount.toLocaleString()}</span>
+            </div>
+         </div>
+      </div>
+      
+      <h3 class="text-xl font-bold mb-4 flex items-center gap-2 text-[#1a1a1a] dark:text-white"><span class="chip chip-info">${mediaData.items.length}</span> Media Archive</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-10">
+        ${mediaHtml || '<div class="col-span-full card bg-[#f9fafb] dark:bg-[#1c2430] text-[#8e8e93] p-8 text-center border-dashed">No saved media yet.</div>'}
+      </div>
+      
+      <h3 class="text-xl font-bold mb-4 text-[#1a1a1a] dark:text-white">Historical Timeline</h3>
+      <div class="card p-6 bg-[#f9fafb] dark:bg-[#1c2430]">
+         ${renderProfileTimeline(username) || '<div class="text-[#8e8e93] text-center p-4">No historical changes tracked yet.</div>'}
+      </div>
+    `;
+  } catch (err) {
+    $('#dossier-content').innerHTML = `<div class="card p-8 bg-[#fff0ed] text-[#ff5530] border-l-4 border-[#ff5530]">Failed to load dossier: ${escapeHtml(err.message)}</div>`;
+  }
+};
+
+window.closeProfileDossier = () => {
+  const modal = $('#dossier-modal');
+  if (modal) {
+    modal.classList.add('translate-x-full');
+    setTimeout(() => modal.remove(), 300);
+  }
+};

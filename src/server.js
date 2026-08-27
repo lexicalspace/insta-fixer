@@ -493,6 +493,28 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     res.json({ ok: r.ok, results: r.results });
   });
 
+  app.get("/api/media/user/:username", requireAuth, async (req, res) => {
+    const items = [];
+    const username = req.params.username;
+    try {
+      for (const f of await store.listMedia(username)) {
+        if (!isSafeMediaPath(f.username, f.name)) continue;
+        items.push({
+          username: f.username,
+          file: f.name,
+          kind: f.name.startsWith("avatar-") ? "avatar" : f.name.startsWith("story-") ? "story" : "post",
+          size: f.bytes,
+          mtime: f.mtimeMs,
+          url: `/api/media/${encodeURIComponent(f.username)}/${encodeURIComponent(f.name)}`,
+        });
+      }
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    items.sort((a, b) => b.mtime - a.mtime);
+    res.json({ items });
+  });
+
   app.get('/api/media/all', requireAuth, async (req, res) => {
     const items = [];
     try {
