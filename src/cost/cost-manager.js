@@ -80,13 +80,13 @@ export const DEFAULT_LIMITS = {
     dailyUnits: Math.floor(5000 / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()),
     monthlyUnits: 5000,
   },
-  /** Lobstr bills per result credit; same free-allowance caveat as Bright Data. */
+  /** Lobstr bills per result credit. It provides 100 free credits per month. */
   lobstr: {
     tier: TIER.LOW_COST,
     unitCostUsd: 0.002,
-    freeUnitsPerMonth: 0,
-    dailyUnits: Math.floor(1000 / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()),
-    monthlyUnits: 1000,
+    freeUnitsPerMonth: 100,
+    dailyUnits: Math.floor(100 / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()),
+    monthlyUnits: 100,
   },
   llm: {
     tier: TIER.FREE,
