@@ -1682,7 +1682,7 @@ setInterval(liveRefresh, 15000);
 
 window.openProfileDossier = async (username) => {
   try {
-  let modal = $('#dossier-modal');
+  let modal = document.getElementById('dossier-modal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'dossier-modal';
@@ -1724,7 +1724,7 @@ window.openProfileDossier = async (username) => {
        return `<img src="${m.url}" class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox(window.currentDossierMedia, ${i})">`;
     }).join('');
     
-    $('#dossier-content').innerHTML = `
+    document.getElementById('dossier-content').innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
          <div class="col-span-1 md:col-span-3 card p-6 bg-gradient-to-r from-[#f9fafb] to-white dark:from-[#1c2430] dark:to-[#202835]">
             <h3 class="text-xs font-bold text-[#8e8e93] uppercase tracking-wide mb-3">Biography</h3>
@@ -1757,13 +1757,13 @@ window.openProfileDossier = async (username) => {
       </div>
     `;
   } catch (err) {
-    $('#dossier-content').innerHTML = `<div class="card p-8 bg-[#fff0ed] text-[#ff5530] border-l-4 border-[#ff5530]">Failed to load dossier: ${escapeHtml(err.message)}</div>`;
+    document.getElementById('dossier-content').innerHTML = `<div class="card p-8 bg-[#fff0ed] text-[#ff5530] border-l-4 border-[#ff5530]">Failed to load dossier: ${escapeHtml(err.message)}</div>`;
   }
   } catch (outerErr) { alert("Outer error: " + outerErr.message); }
 };
 
 window.closeProfileDossier = () => {
-  const modal = $('#dossier-modal');
+  const modal = document.getElementById('dossier-modal');
   if (modal) {
     modal.classList.add('translate-x-full');
     setTimeout(() => modal.remove(), 300);
