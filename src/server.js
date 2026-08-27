@@ -168,6 +168,9 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   app.post('/api/config', requireAuth, (req, res) => {
     const body = req.body || {};
     const patch = {};
+    if (typeof body.pollOnStartup === 'boolean') {
+      patch.pollOnStartup = body.pollOnStartup;
+    }
     if (typeof body.intervalHours === 'number') {
       const h = body.intervalHours;
       if (!(h >= 1 && h <= 168)) {
@@ -359,7 +362,6 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       if (startDate !== undefined) cfg.providerLimits[provider].startDate = startDate;
       if (endDate !== undefined) cfg.providerLimits[provider].endDate = endDate;
       store.setConfig({ providerLimits: cfg.providerLimits });
-      ...(typeof req.body.pollOnStartup === "boolean" ? { pollOnStartup: req.body.pollOnStartup } : {}),
 
 
       if (currentUsage !== undefined) {
@@ -479,7 +481,6 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       store.mute(() => {
         const cfg = store.getConfig();
         store.setConfig({
-      ...(typeof req.body.pollOnStartup === "boolean" ? { pollOnStartup: req.body.pollOnStartup } : {}),
 
           hfLastUploadAt: r.ok ? new Date().toISOString() : cfg.hfLastUploadAt || null,
           hfLastError: r.ok ? null : (r.errors || []).join('; ') || null,
