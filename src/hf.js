@@ -167,7 +167,6 @@ async function commitBatch(config, batch, title) {
   if (entries.length) await commitNDJSON(config, entries, title);
 }
 
-}
 
 /**
  * Uploads the full local state as a `_meta` folder plus per-profile media:
