@@ -1473,13 +1473,18 @@ async function renderQuotaPage() {
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">`;
     
     for (const [name, p] of Object.entries(usage.providers)) {
-      const isExhausted = p.usedPct >= 100;
-      const barColor = isExhausted ? 'bg-[#ff5530]' : 'bg-[#1ba673]';
+      const isExhausted = p.usedPct >= 100 && p.monthlyCeiling > 0;
+      const isSkipped = p.monthlyCeiling === 0 && p.month.units === 0;
+      const isOverrun = p.monthlyCeiling === 0 && p.month.units > 0;
+      
+      let barColor = isExhausted || isOverrun ? 'bg-[#ff5530]' : (isSkipped ? 'bg-[#8e8e93]' : 'bg-[#1ba673]');
+      let chipText = isSkipped ? 'No Free Tier' : (isExhausted || isOverrun ? 'Exhausted' : 'Healthy');
+      let chipClass = isSkipped ? 'bg-[#eaecf0] text-[#45515e] dark:bg-[#2a3441] dark:text-[#a8b3c0] rounded-full px-2 py-0.5 text-xs font-semibold' : (isExhausted || isOverrun ? 'chip-err' : 'chip-ok');
       html += `
         <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
             <h3 class="font-bold text-lg capitalize text-[#1a1a1a] dark:text-white">${name}</h3>
-            <span class="chip ${isExhausted ? 'chip-err' : 'chip-ok'}">${isExhausted ? 'Exhausted' : 'Healthy'}</span>
+            <span class="${chipClass.includes('chip') ? 'chip ' + chipClass : chipClass}">${chipText}</span>
           </div>
           <div class="mb-2 flex justify-between text-sm">
             <span class="text-[#8e8e93]">Monthly Usage</span>

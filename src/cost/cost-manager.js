@@ -269,7 +269,7 @@ export class CostManager {
       const state = this.repo.providerState(doc, name, now);
       const lim = this.limitsFor(name);
       const ceiling = this.monthlyCeiling(name, mode);
-      const usedPct = ceiling ? Math.min(100, Math.round((state.month.units / ceiling) * 100)) : 100;
+      const usedPct = ceiling ? Math.min(100, Math.round((state.month.units / ceiling) * 100)) : (state.month.units > 0 ? 100 : 0);
       providers[name] = {
         tier: lim.tier,
         mode,
