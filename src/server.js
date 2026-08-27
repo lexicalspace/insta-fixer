@@ -97,7 +97,8 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       lastPollAt: cfg.lastPollAt,
       lastPollStatus: cfg.lastPollStatus,
       lastPollError: cfg.lastPollError,
-      nextPollAt: cfg.nextPollAt,
+      nextPollAt: cfg.lastPollAt ? new Date(Date.parse(cfg.lastPollAt) + (activeConfig.pollIntervalHours * (Number.isFinite(throttle) ? throttle : 1) * 60 * 60 * 1000)).toISOString() : null,
+
       totalSnapshots: cfg.totalSnapshots || 0,
       totalChanges: cfg.totalChanges || 0,
       retentionEnabled: cfg.retentionEnabled !== false,
