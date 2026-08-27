@@ -1710,11 +1710,12 @@ window.openProfileDossier = async (username) => {
     const currentFollowing = latestProfile?.followsCount || 0;
     const postsCount = latestProfile?.postsCount || 0;
     
+    window.currentDossierMedia = mediaData.items.map(x => x.url);
     const mediaHtml = mediaData.items.map((m, i) => {
        if (m.kind === 'story' && m.file.endsWith('.mp4')) {
-         return `<video src="${m.url}" autoplay loop muted playsinline class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox([${mediaData.items.map(x=>`'${x.url}'`).join(',')}], i)"></video>`;
+         return `<video src="${m.url}" autoplay loop muted playsinline class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox(window.currentDossierMedia, ${i})"></video>`;
        }
-       return `<img src="${m.url}" class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox([${mediaData.items.map(x=>`'${x.url}'`).join(',')}], i)">`;
+       return `<img src="${m.url}" class="w-full h-48 md:h-64 object-cover rounded-lg shadow-sm border border-[#eaecf0] dark:border-[#2a3441] cursor-pointer" onclick="openLightbox(window.currentDossierMedia, ${i})">`;
     }).join('');
     
     $('#dossier-content').innerHTML = `
