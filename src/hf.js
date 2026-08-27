@@ -426,7 +426,7 @@ export async function restoreFromHF(config, store) {
  * via flush(). Concurrent flushes are serialized and any change that lands
  * during a flush triggers a follow-up run.
  */
-export function createSyncDebouncer(config, store, { delayMs = 5 * 60 * 1000, sync = syncToHF } = {}) {
+export function createSyncDebouncer(config, store, { delayMs = 1 * 60 * 1000, sync = syncToHF } = {}) {
   let timer = null;
   let running = false;
   let pending = false;

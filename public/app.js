@@ -1681,6 +1681,7 @@ setInterval(liveRefresh, 15000);
 
 
 window.openProfileDossier = async (username) => {
+  try {
   let modal = $('#dossier-modal');
   if (!modal) {
     modal = document.createElement('div');
@@ -1758,6 +1759,7 @@ window.openProfileDossier = async (username) => {
   } catch (err) {
     $('#dossier-content').innerHTML = `<div class="card p-8 bg-[#fff0ed] text-[#ff5530] border-l-4 border-[#ff5530]">Failed to load dossier: ${escapeHtml(err.message)}</div>`;
   }
+  } catch (outerErr) { alert("Outer error: " + outerErr.message); }
 };
 
 window.closeProfileDossier = () => {

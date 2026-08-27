@@ -137,13 +137,16 @@ export function schedule(config, store, options = {}) {
     });
   };
 
-  // Run immediately on startup if configured (defaults to true)
+  // Auto-run on startup ONLY if we have completely missed the scheduled poll time.
   const cfg = store.getConfig();
-  if (cfg.pollOnStartup !== false) {
+  const last = cfg.lastPollAt ? new Date(cfg.lastPollAt).getTime() : 0;
+  if (Date.now() - last >= ms) {
+    console.log("[poller] We missed a scheduled poll while offline. Running catch-up poll now.");
     setTimeout(run, 5000);
   } else {
-    console.log("[poller] Skipping immediate poll on startup (pollOnStartup=false). Next poll scheduled.");
+    console.log("[poller] Startup polling disabled. Next poll will run at scheduled time.");
   }
+
 
 
   const timer = setInterval(run, ms);

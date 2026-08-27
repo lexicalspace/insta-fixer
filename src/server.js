@@ -199,6 +199,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       return res.status(400).json({ error: 'Nothing to update.' });
     }
     store.setConfig(patch);
+
     const cfg = store.getConfig();
     res.json({ ok: true, ...patch, intervalHours: patch.intervalHours ?? cfg.intervalHours });
   });
@@ -266,7 +267,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
           store.setHfManifest(manifest);
         }
 
-        await syncToHF(store, config);
+        const r = await syncToHF(store, config);
 
 
       } catch (err) {
@@ -285,7 +286,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     if (hfEnabled(config)) {
       try {
         // Do not delete from HF so the data can be recovered if added back
-        await syncToHF(store, config);
+        const r = await syncToHF(store, config);
 
 
       } catch (err) {
@@ -475,7 +476,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       return res.status(400).json({ error: 'HF not configured. Set HF_TOKEN and HF_DATASET.' });
     }
     try {
-        await syncToHF(store, config);
+        const r = await syncToHF(store, config);
 
 
       store.mute(() => {
