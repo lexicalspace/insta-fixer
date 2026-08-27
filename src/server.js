@@ -73,13 +73,15 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     const authed = isAuthed(req);
     const now = Date.now();
     const throttle = stack.costManager.throttleFactor('apify');
+    const activeConfig = { ...config, pollIntervalHours: cfg.intervalHours ?? config.pollIntervalHours, batchIntervalHours: cfg.batchIntervalHours ?? config.batchIntervalHours };
     const profiles = (cfg.profiles || []).map((p) => {
-      const intervalHours = profileInterval(p, config, throttle);
+      const intervalHours = profileInterval(p, activeConfig, throttle);
       const nextPollAt = p.lastPolledAt && Number.isFinite(intervalHours)
         ? new Date(Date.parse(p.lastPolledAt) + intervalHours * 60 * 60 * 1000).toISOString()
         : null;
-      return { ...p, intervalHours, nextPollAt, due: isDue(p, config, now, throttle) };
+      return { ...p, intervalHours, nextPollAt, due: isDue(p, activeConfig, now, throttle) };
     });
+
     res.json({
       passwordSet,
       locked: passwordSet && !authed,
@@ -145,13 +147,20 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   });
 
   function normalizeUsername(input) {
-    const username = String(input || '')
-      .trim()
-      .replace(/^https?:\/\/(www\.)?instagram\.com\//, '')
-      .replace(/\/+$/, '')
-      .replace(/^@/, '');
+    let username = String(input || "").trim();
+    try {
+      if (username.startsWith("http")) {
+        const url = new URL(username);
+        const parts = url.pathname.split("/").filter(Boolean);
+        if (parts.length > 0) {
+          username = parts[0];
+        }
+      }
+    } catch (e) {}
+    username = username.replace(/^@/, "").split("?")[0].split("/")[0];
     return /^[a-zA-Z0-9._]{1,30}$/.test(username) ? username : null;
   }
+
 
   app.post('/api/config', requireAuth, (req, res) => {
     const body = req.body || {};
@@ -287,7 +296,10 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
 
       const force = req.query.force === '1' || req.query.force === 'true';
       const restore = req.query.restore === '1' || req.query.restore === 'true';
-      const result = await runCronCycle(store, config, { force, restore, owner: 'http', lock: pollLock });
+      const cfg = store.getConfig();
+      const activeConfig = { ...config, pollIntervalHours: cfg.intervalHours ?? config.pollIntervalHours, batchIntervalHours: cfg.batchIntervalHours ?? config.batchIntervalHours };
+      const result = await runCronCycle(store, activeConfig, { force, restore, owner: "http", lock: pollLock });
+
       if (result.busy) return res.status(409).json(result);
       res.json(result);
     } catch (err) {
@@ -583,7 +595,10 @@ export async function main() {
     keepAlive: true,
     onPoll: async (s, c) => {
       if (useSupabase) await store.hydrate();
-      const result = await runCronCycle(s, c, { owner: 'internal-scheduler', lock: pollLock });
+      const cfg = s.getConfig();
+      const activeConfig = { ...c, pollIntervalHours: cfg.intervalHours ?? c.pollIntervalHours, batchIntervalHours: cfg.batchIntervalHours ?? c.batchIntervalHours };
+      const result = await runCronCycle(s, activeConfig, { owner: "internal-scheduler", lock: pollLock });
+
       if (useSupabase) await store.flush();
       return result;
     },

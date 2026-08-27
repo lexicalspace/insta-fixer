@@ -1108,6 +1108,8 @@ async function renderConfigPage() {
     try {
       const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ intervalHours: Number($('#interval-input').value) }) });
       status.intervalHours = r.intervalHours;
+      await refresh();
+
       showToast(`Public poll interval set to every ${r.intervalHours} hour(s).`);
     } catch (err) {
       showToast(err.message, false);
@@ -1441,7 +1443,7 @@ function renderShell() {
       btn.classList.add('active');
       
       setMenuOpen(false);
-      renderPage();
+      await refresh();
     });
   });
 
