@@ -1498,6 +1498,36 @@ async function renderQuotaPage() {
               <div class="font-semibold text-[#45515e] dark:text-[#a8b3c0]">${p.remainingMonth}</div>
             </div>
           </div>
+          
+          <div class="mt-5 pt-4 border-t border-[#eaecf0] dark:border-[#2a3441]">
+            <h4 class="text-xs font-bold text-[#8e8e93] uppercase mb-3">API Health & Analysis</h4>
+            <div class="flex items-center gap-4">
+              ${(() => {
+                const total = p.health.success + p.health.failure;
+                const successPct = total > 0 ? (p.health.success / total) * 100 : 0;
+                return `
+                <div class="relative w-16 h-16 flex-shrink-0 rounded-full" style="background: ${total > 0 ? `conic-gradient(#1ba673 0% ${successPct}%, #ff5530 ${successPct}% 100%)` : '#eaecf0'}">
+                  <div class="absolute inset-[15%] bg-white dark:bg-[#1c2430] rounded-full flex items-center justify-center text-xs font-bold text-[#1a1a1a] dark:text-white">
+                     ${total > 0 ? Math.round(successPct) + "%" : "-"}
+                  </div>
+                </div>
+                <div class="flex-1 text-sm">
+                  <div class="flex justify-between mb-1">
+                    <span class="text-[#1ba673] flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#1ba673]"></span> Success</span>
+                    <span class="font-medium text-[#1a1a1a] dark:text-white">${p.health.success}</span>
+                  </div>
+                  <div class="flex justify-between mb-1">
+                    <span class="text-[#ff5530] flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#ff5530]"></span> Errors</span>
+                    <span class="font-medium text-[#1a1a1a] dark:text-white">${p.health.failure}</span>
+                  </div>
+                  <div class="flex justify-between text-xs mt-2 pt-2 border-t border-[#eaecf0] dark:border-[#2a3441] text-[#8e8e93]">
+                    <span>Total calls: ${total}</span>
+                    <span>Month errs: ${p.month.errors}</span>
+                  </div>
+                </div>`;
+              })()}
+            </div>
+          </div>
         </div>`;
     }
     
