@@ -1443,7 +1443,7 @@ function renderShell() {
       btn.classList.add('active');
       
       setMenuOpen(false);
-      await refresh();
+      renderPage();
     });
   });
 
