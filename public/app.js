@@ -567,9 +567,7 @@ function leaderboardTable() {
           }).join('')}
         </tbody>
       </table>
-    </div>
-    ${hasMore ? `<button class="w-full mt-4 py-2 text-sm font-semibold text-[#1a1a1a] dark:text-white bg-[#f9fafb] dark:bg-[#1c2430] border border-[#eaecf0] dark:border-[#2a3441] rounded-lg hover:bg-[#eaecf0] dark:hover:bg-[#2a3441] transition-colors" onclick="loadMoreTimeline('${escapeHtml(username)}')">Load More</button>` : ''}
-    `;
+    </div>`;
 }
 
 /* ---------- Pages ---------- */
@@ -585,7 +583,30 @@ function pageHeader(title, subtitle) {
 function renderFailedProfiles() {
   const profiles = status.profiles || [];
   const failed = profiles.filter(p => p.lastPollError);
-  if (!failed.length) return '';
+  
+  if (!failed.length) {
+    if (!status.lastPollError) {
+      return `
+        <div class="card p-4 mt-6 border-l-4 border-[#1ba673] bg-[#f0fdf4] dark:bg-[#0f291e]">
+          <div class="text-sm font-bold text-[#1ba673] flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            All profiles polling successfully
+          </div>
+        </div>
+      `;
+    }
+    
+    return `
+      <div class="card p-6 mt-6 border-l-4 border-[#ffcc00] bg-[#fffbed] dark:bg-[#2c2618]">
+        <h3 class="text-sm font-bold text-[#ffcc00] mb-2 flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          Polling Issues
+        </h3>
+        <div class="text-sm text-[#ffcc00]">${escapeHtml(status.lastPollError)} (Specific profile errors will appear here on the next poll)</div>
+      </div>
+    `;
+  }
+  
   return `
     <div class="card p-6 mt-6 border-l-4 border-[#ff5530] bg-[#fff0ed] dark:bg-[#2c1a18]">
       <h3 class="text-lg font-bold text-[#ff5530] mb-3 flex items-center gap-2">
