@@ -112,6 +112,12 @@ function fieldLabel(field) {
   }[field] || field;
 }
 
+const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23a8aab2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>';
+function renderAvatar(username, filename, classes) {
+  const src = filename ? escapeHtml(mediaUrl(username, filename)) : DEFAULT_AVATAR;
+  return `<img class="${classes}" src="${src}" onerror="this.src='${DEFAULT_AVATAR}'" alt="avatar" />`;
+}
+
 function mediaUrl(username, file) {
   return file ? `/api/media/${encodeURIComponent(username)}/${encodeURIComponent(file)}` : null;
 }
@@ -121,9 +127,9 @@ function changeItem(username, change) {
     return `
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2">
-          ${change.from ? `<img class="h-14 w-14 rounded-full border border-[#eaecf0] object-cover" src="${escapeHtml(mediaUrl(username, change.from))}" alt="old avatar" />` : ''}
+          ${change.from ? renderAvatar(username, change.from, "h-14 w-14 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb]") : ''}
           <span class="text-[#8e8e93]">→</span>
-          ${change.to ? `<img class="h-14 w-14 rounded-full border border-[#eaecf0] object-cover" src="${escapeHtml(mediaUrl(username, change.to))}" alt="new avatar" />` : ''}
+          ${change.to ? renderAvatar(username, change.to, "h-14 w-14 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb]") : ''}
         </div>
         <div class="text-sm font-semibold">${fieldLabel(change.field)} changed</div>
       </div>`;
@@ -550,7 +556,7 @@ function leaderboardTable() {
                 <td class="py-3 pr-3">
                   <div class="flex items-center gap-3">
                     <span class="inline-block h-2.5 w-2.5 rounded-full shrink-0" style="background:${accent}"></span>
-                    ${avatar ? `<img class="h-8 w-8 rounded-full border border-[#eaecf0] object-cover" src="${escapeHtml(mediaUrl(r.username, avatar))}" alt="" />` : ''}
+                    ${renderAvatar(r.username, avatar, 'h-8 w-8 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb] dark:bg-[#141a23]')}
                     <div class="min-w-0">
                       <div class="font-semibold truncate">@${escapeHtml(r.username)}${r.isPrivate ? ' <span class="text-[#8e8e93]">· private</span>' : ''}</div>
                       <div class="text-[10px] text-[#8e8e93]">${r.snapCount} snapshot${r.snapCount === 1 ? '' : 's'}</div>
@@ -1068,7 +1074,7 @@ async function renderConfigPage() {
     const current = Number.isFinite(p.intervalHours) ? p.intervalHours : null;
     return `
       <div class="flex items-center gap-4 rounded-2xl bg-[#f7f8fa] dark:bg-[#1c2430] p-3 border-l-4" style="border-left-color:${accent}">
-        ${avatar ? `<img class="h-11 w-11 rounded-full border border-[#eaecf0] object-cover" src="${escapeHtml(mediaUrl(p.username, avatar))}" alt="" />` : ''}
+        ${renderAvatar(p.username, avatar, 'h-11 w-11 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb] dark:bg-[#141a23]')}
         <div class="min-w-0 flex-1">
           <div class="font-semibold truncate">@${escapeHtml(p.username)}</div>
           <div class="mt-1 flex flex-wrap gap-1">${profileBadges(p)}</div>
@@ -1764,7 +1770,7 @@ window.openProfileDossier = async (username) => {
   modal.innerHTML = `
     <div class="flex items-center justify-between p-4 border-b border-[#eaecf0] dark:border-[#2a3441] bg-[#f7f8fa] dark:bg-[#1c2430]">
       <h2 class="text-xl font-bold flex items-center gap-3">
-        ${latestAvatar(username) ? `<img src="${escapeHtml(mediaUrl(username, latestAvatar(username)))}" class="w-10 h-10 rounded-full object-cover border border-[#eaecf0] dark:border-[#2a3441]">` : ''}
+        ${renderAvatar(username, latestAvatar(username), 'w-10 h-10 rounded-full object-cover border border-[#eaecf0] dark:border-[#2a3441] bg-[#f9fafb] dark:bg-[#141a23]')}
         @${escapeHtml(username)} Profile Dossier
       </h2>
       <button onclick="closeProfileDossier()" class="btn-pill btn-secondary">Close</button>
