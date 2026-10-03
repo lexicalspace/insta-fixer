@@ -791,15 +791,17 @@ function renderGraphsPage() {
   $('#main').innerHTML = `
     ${pageHeader('Graphs', 'Track follower and following trends over time.')}
     <div class="card p-4 sm:p-6 mb-6">${renderHeatmap(graphUser)}</div>
-    <div class="flex flex-col sm:flex-row gap-3 mb-5">
-      <select id="graph-user-select" class="input w-full sm:w-64">${userOpts}</select>
-      <div class="flex gap-2 flex-wrap">
-        <button class="btn-pill graph-metric ${graphMetric === 'followers' ? 'btn-primary' : 'btn-tertiary'}" data-metric="followers">Followers</button>
-        <button class="btn-pill graph-metric ${graphMetric === 'following' ? 'btn-primary' : 'btn-tertiary'}" data-metric="following">Following</button>
+    <div class="flex flex-col xl:flex-row gap-4 mb-6 p-4 card items-center bg-white dark:bg-[#1c2430]">
+      <select id="graph-user-select" class="input w-full xl:w-64 bg-[#f9fafb] dark:bg-[#141a23] border-[#eaecf0] dark:border-[#2a3441] text-sm">${userOpts}</select>
+      
+      <div class="flex bg-[#f2f2f7] dark:bg-[#141a23] p-1 rounded-lg w-full xl:w-auto">
+        <button class="flex-1 px-4 py-1.5 text-sm font-medium rounded-md transition-all graph-metric ${graphMetric === 'followers' ? 'bg-white dark:bg-[#2a3441] text-black dark:text-white shadow-sm' : 'text-[#8e8e93] hover:text-[#1a1a1a] dark:hover:text-[#d1d5db]'}" data-metric="followers">Followers</button>
+        <button class="flex-1 px-4 py-1.5 text-sm font-medium rounded-md transition-all graph-metric ${graphMetric === 'following' ? 'bg-white dark:bg-[#2a3441] text-black dark:text-white shadow-sm' : 'text-[#8e8e93] hover:text-[#1a1a1a] dark:hover:text-[#d1d5db]'}" data-metric="following">Following</button>
       </div>
-      <div class="flex gap-2 flex-wrap sm:ml-auto">
+
+      <div class="flex bg-[#f2f2f7] dark:bg-[#141a23] p-1 rounded-lg w-full xl:w-auto overflow-x-auto xl:ml-auto">
         ${windowOpts.map(([key, label]) => `
-          <button class="btn-pill ${graphWindow === key ? 'btn-secondary' : 'btn-tertiary'} graph-window" data-window="${key}">${label}</button>`).join('')}
+          <button class="whitespace-nowrap flex-1 px-3 py-1.5 text-sm font-medium rounded-md transition-all graph-window ${graphWindow === key ? 'bg-white dark:bg-[#2a3441] text-black dark:text-white shadow-sm' : 'text-[#8e8e93] hover:text-[#1a1a1a] dark:hover:text-[#d1d5db]'}" data-window="${key}">${label}</button>`).join('')}
       </div>
     </div>
     <div class="card p-6 flex flex-col h-[65vh] min-h-[400px]">
@@ -1693,7 +1695,7 @@ window.openProfileDossier = async (username) => {
   modal.innerHTML = `
     <div class="flex items-center justify-between p-4 border-b border-[#eaecf0] dark:border-[#2a3441] bg-[#f7f8fa] dark:bg-[#1c2430]">
       <h2 class="text-xl font-bold flex items-center gap-3">
-        ${latestAvatar(username) ? `<img src="${latestAvatar(username)}" class="w-10 h-10 rounded-full object-cover">` : ''}
+        ${latestAvatar(username) ? `<img src="${escapeHtml(mediaUrl(username, latestAvatar(username)))}" class="w-10 h-10 rounded-full object-cover border border-[#eaecf0] dark:border-[#2a3441]">` : ''}
         @${escapeHtml(username)} Profile Dossier
       </h2>
       <button onclick="closeProfileDossier()" class="btn-pill btn-secondary">Close</button>
@@ -1713,7 +1715,7 @@ window.openProfileDossier = async (username) => {
     
     const currentBio = latestProfile?.biography || 'No biography tracked yet.';
     const currentFollowers = latestProfile?.followersCount || 0;
-    const currentFollowing = latestProfile?.followsCount || 0;
+    const currentFollowing = latestProfile?.followingCount || 0;
     const postsCount = latestProfile?.postsCount || 0;
     
     window.currentDossierMedia = mediaData.items.map(x => x.url);
