@@ -43,7 +43,9 @@ export function createStack(store, config, { runner = null, storiesFetcher = nul
       host: 'instagram-profile-data-scraper.p.rapidapi.com',
       profilePath: '/instagram/profile',
       usernameParam: 'username',
-      hdAvatarField: 'profile_pic_url_hd'
+      hdAvatarField: 'profile_pic_url_hd',
+      storiesPath: null,
+      highlightsPath: null
     },
     {
       name: 'rapidapi-api14',
@@ -59,7 +61,9 @@ export function createStack(store, config, { runner = null, storiesFetcher = nul
       host: 'instagram-cheapest.p.rapidapi.com',
       profilePath: '/api/v1/instagram/user',
       usernameParam: 'username',
-      hdAvatarField: 'profile_pic_url_hd'
+      hdAvatarField: 'profile_pic_url_hd',
+      storiesPath: null,
+      highlightsPath: null
     },
     {
       name: 'rapidapi-jotucker',
@@ -67,7 +71,9 @@ export function createStack(store, config, { runner = null, storiesFetcher = nul
       host: 'instagram-scraper2.p.rapidapi.com',
       profilePath: '/user_info',
       usernameParam: 'user_id',
-      hdAvatarField: 'profile_pic_url_hd'
+      hdAvatarField: 'profile_pic_url_hd',
+      storiesPath: null,
+      highlightsPath: null
     },
     {
       name: 'rapidapi-20251',
@@ -75,7 +81,9 @@ export function createStack(store, config, { runner = null, storiesFetcher = nul
       host: 'instagram-scraper-20251.p.rapidapi.com',
       profilePath: '/userinfo/',
       usernameParam: 'username_or_id',
-      hdAvatarField: 'profile_pic_url_hd'
+      hdAvatarField: 'profile_pic_url_hd',
+      storiesPath: null,
+      highlightsPath: null
     }
   ].map(r => new RapidApiProvider({ ...config, rapidapi: { ...config.rapidapi, ...r } })) : [new RapidApiProvider(config)];
 
