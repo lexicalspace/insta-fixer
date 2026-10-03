@@ -112,7 +112,7 @@ function fieldLabel(field) {
   }[field] || field;
 }
 
-const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23a8aab2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>';
+const DEFAULT_AVATAR = 'data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22%23a8aab2%22%3E%3Cpath%20d%3D%22M12%202C6.48%202%202%206.48%202%2012s4.48%2010%2010%2010%2010-4.48%2010-10S17.52%202%2012%202zm0%203c1.66%200%203%201.34%203%203s-1.34%203-3%203-3-1.34-3-3%201.34-3%203-3zm0%2014.2c-2.5%200-4.71-1.28-6-3.22.03-1.99%204-3.08%206-3.08%201.99%200%205.97%201.09%206%203.08-1.29%201.94-3.5%203.22-6%203.22z%22/%3E%3C/svg%3E';
 function renderAvatar(username, filename, classes) {
   const src = filename ? escapeHtml(mediaUrl(username, filename)) : DEFAULT_AVATAR;
   return `<img class="${classes}" src="${src}" onerror="this.src='${DEFAULT_AVATAR}'" alt="avatar" />`;
@@ -534,7 +534,7 @@ function leaderboardTable() {
     const active = lbSort.key === c.key;
     const arrow = active ? (lbSort.dir === -1 ? ' ▼' : ' ▲') : '';
     return `<button class="lb-sort font-semibold text-[#45515e] dark:text-[#a8b3c0] text-xs uppercase tracking-wide hover:text-[#0a0a0a] ${active ? 'text-[#0a0a0a] dark:text-white' : ''}" data-key="${c.key}">${c.label}${arrow}</button>`;
-  }).join('');
+  });
   return `
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
@@ -543,7 +543,7 @@ function leaderboardTable() {
             <th class="text-left py-2 pr-3 text-xs font-semibold text-[#8e8e93] uppercase tracking-wide w-14">Pos</th>
             <th class="text-left py-2 pr-3 text-xs font-semibold text-[#8e8e93] uppercase tracking-wide">Profile</th>
             <th class="text-right py-2 px-2 text-xs font-semibold text-[#8e8e93] uppercase tracking-wide">Trend</th>
-            ${cols.map((c) => `<th class="text-right py-2 px-2">${header[cols.indexOf(c)]}</th>`).join('')}
+            ${cols.map((c, i) => `<th class="text-right py-2 px-2">${header[i]}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
