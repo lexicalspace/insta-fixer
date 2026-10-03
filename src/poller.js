@@ -279,7 +279,7 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
   };
 
   store.saveSnapshot(username, snapshot);
-  store.updateProfile(username, { lastPolledAt: snapshot.at });
+  store.updateProfile(username, { lastPolledAt: snapshot.at, lastPollError: null, lastPollErrorAt: null });
   return { snapshot, storyChanged };
 }
 
@@ -376,7 +376,9 @@ export async function poll(store, config, { force = false, runner = runActorSync
         newStories: storyChanged.length,
       });
     } catch (err) {
-      results.push(failureRow(entry.username, err));
+      const failInfo = failureRow(entry.username, err);
+      store.updateProfile(entry.username, { lastPollError: failInfo.error, lastPollErrorAt: startedAt });
+      results.push(failInfo);
     }
   }
 
@@ -407,7 +409,9 @@ export async function poll(store, config, { force = false, runner = runActorSync
               newStories: storyChanged.length,
             });
           } catch (err) {
-            results.push(failureRow(entry.username, err, { ping: true, wentPublic: true }));
+            const failInfo = failureRow(entry.username, err, { ping: true, wentPublic: true });
+            store.updateProfile(entry.username, { lastPollError: failInfo.error, lastPollErrorAt: startedAt });
+            results.push(failInfo);
           }
         } else {
           results.push({
@@ -422,7 +426,8 @@ export async function poll(store, config, { force = false, runner = runActorSync
       }
     } catch (err) {
       for (const entry of pendingPings) {
-        results.push({ username: entry.username, ok: true, due: false, ping: true, error: err.message });
+        store.updateProfile(entry.username, { lastPollError: err.message, lastPollErrorAt: startedAt });
+        results.push({ username: entry.username, ok: false, due: false, ping: true, error: err.message });
       }
     }
   }

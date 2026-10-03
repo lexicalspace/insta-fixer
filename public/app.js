@@ -3,7 +3,8 @@ const toastEl = document.getElementById('toast');
 
 let status = null;
 let historyData = null;
-let activeAccount = 'all';
+let activeAccount = null;
+let timelineLimit = 5;
 let lbWindow = 'all';
 let lbSort = { key: 'changes', dir: -1 };
 let page = 'dashboard';
@@ -380,8 +381,9 @@ function profileBadges(profile) {
 
 function renderProfilesNav() {
   const profiles = status.profiles || [];
+  if (!activeAccount && profiles.length > 0) activeAccount = profiles[0].username;
+  timelineLimit = 5;
   const items = [
-    `<button class="nav-pill ${activeAccount === 'all' ? 'active' : ''}" data-account="all">All</button>`,
     ...profiles.map((p) => `
       <button class="nav-pill ${activeAccount === p.username ? 'active' : ''}" data-account="${escapeHtml(p.username)}">
         @${escapeHtml(p.username)}${p.isPrivate ? ' · private' : ''}
@@ -392,7 +394,6 @@ function renderProfilesNav() {
 
 function visibleAccounts() {
   const profiles = status.profiles || [];
-  if (activeAccount === 'all') return profiles.map((p) => p.username);
   return profiles.some((p) => p.username === activeAccount) ? [activeAccount] : [];
 }
 
@@ -402,8 +403,11 @@ function renderProfileTimeline(username) {
     return `<div class="text-center py-8 text-[#8e8e93]">No snapshots yet. Run the first poll from Config.</div>`;
   }
   
-  const filtered = [...list].reverse().filter(snap => snap.changeCount > 0 || (snap.stories && snap.stories.length > 0));
-  if (!filtered.length) {
+    const filtered = [...list].reverse().filter(snap => snap.changeCount > 0 || (snap.stories && snap.stories.length > 0));
+  const hasMore = filtered.length > timelineLimit;
+  const sliced = filtered.slice(0, timelineLimit);
+
+  if (!sliced.length) {
     return `<div class="text-center py-8 text-[#8e8e93]">No changes or new stories have been detected yet.</div>`;
   }
 
@@ -417,7 +421,7 @@ function renderProfileTimeline(username) {
           </tr>
         </thead>
         <tbody class="divide-y divide-[#eaecf0] dark:divide-[#2a3441] bg-white dark:bg-[#1c2430]">
-          ${filtered.map((snap) => `
+          ${sliced.map((snap) => `
             <tr class="hover:bg-[#f9fafb] dark:hover:bg-[#202835] transition-colors fade-in">
               <td class="p-3 align-top whitespace-nowrap text-[#8e8e93]">
                 ${fmtTime(snap.at)}
@@ -432,8 +436,16 @@ function renderProfileTimeline(username) {
           `).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>
+    ${hasMore ? `<button class="w-full mt-4 py-2 text-sm font-semibold text-[#1a1a1a] dark:text-white bg-[#f9fafb] dark:bg-[#1c2430] border border-[#eaecf0] dark:border-[#2a3441] rounded-lg hover:bg-[#eaecf0] dark:hover:bg-[#2a3441] transition-colors" onclick="loadMoreTimeline('${escapeHtml(username)}')">Load More</button>` : ''}
+    `;
 }
+
+window.loadMoreTimeline = (username) => {
+  timelineLimit += 5;
+  const el = document.getElementById(`timeline-${escapeHtml(username)}`);
+  if (el) el.innerHTML = renderProfileTimeline(username);
+};
 
 function renderHistorySections() {
   const usernames = visibleAccounts();
@@ -555,7 +567,9 @@ function leaderboardTable() {
           }).join('')}
         </tbody>
       </table>
-    </div>`;
+    </div>
+    ${hasMore ? `<button class="w-full mt-4 py-2 text-sm font-semibold text-[#1a1a1a] dark:text-white bg-[#f9fafb] dark:bg-[#1c2430] border border-[#eaecf0] dark:border-[#2a3441] rounded-lg hover:bg-[#eaecf0] dark:hover:bg-[#2a3441] transition-colors" onclick="loadMoreTimeline('${escapeHtml(username)}')">Load More</button>` : ''}
+    `;
 }
 
 /* ---------- Pages ---------- */
@@ -566,6 +580,29 @@ function pageHeader(title, subtitle) {
       <h1 class="text-2xl font-bold tracking-tight">${title}</h1>
       <p class="text-sm text-[#5f5f5f] dark:text-[#a8b3c0] mt-1">${subtitle}</p>
     </header>`;
+}
+
+function renderFailedProfiles() {
+  const profiles = status.profiles || [];
+  const failed = profiles.filter(p => p.lastPollError);
+  if (!failed.length) return '';
+  return `
+    <div class="card p-6 mt-6 border-l-4 border-[#ff5530] bg-[#fff0ed] dark:bg-[#2c1a18]">
+      <h3 class="text-lg font-bold text-[#ff5530] mb-3 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        Failing Profiles
+      </h3>
+      <div class="flex flex-col gap-2">
+        ${failed.map(p => `
+          <div class="flex items-start justify-between gap-4 text-sm bg-white dark:bg-[#1c2430] p-3 rounded-lg border border-[#eaecf0] dark:border-[#2a3441]">
+            <div class="font-semibold text-[#1a1a1a] dark:text-white shrink-0">@${escapeHtml(p.username)}</div>
+            <div class="text-[#ff5530] break-all">${escapeHtml(p.lastPollError)}</div>
+            <div class="text-[#8e8e93] text-xs shrink-0">${p.lastPollErrorAt ? fmtTime(p.lastPollErrorAt) : ''}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
 }
 
 function renderDashboardPage() {
@@ -593,6 +630,7 @@ function renderDashboardPage() {
       <div class="rounded-2xl bg-[#f7f8fa] dark:bg-[#1c2430] p-4"><div class="text-sm font-bold">${fmtTime(s.nextPollAt)}</div><div class="text-xs font-semibold text-[#8e8e93] mt-1">next poll</div></div>
     </div>
     ${renderProfileCards()}
+    ${renderFailedProfiles()}
     <div class="grid gap-6 mt-6">${renderHistorySections()}</div>`;
 
   renderSparks($('#main'));
