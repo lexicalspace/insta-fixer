@@ -401,27 +401,37 @@ function renderProfileTimeline(username) {
   if (!list.length) {
     return `<div class="text-center py-8 text-[#8e8e93]">No snapshots yet. Run the first poll from Config.</div>`;
   }
-  const reversed = [...list].reverse();
+  
+  const filtered = [...list].reverse().filter(snap => snap.changeCount > 0 || (snap.stories && snap.stories.length > 0));
+  if (!filtered.length) {
+    return `<div class="text-center py-8 text-[#8e8e93]">No changes or new stories have been detected yet.</div>`;
+  }
+
   return `
-    <div class="relative space-y-6 pl-6 border-l border-[#eaecf0] dark:border-[#262d38]">
-      ${reversed.map((snap) => `
-        <div class="relative fade-in">
-          <span class="absolute -left-[31px] top-1 h-3 w-3 rounded-full border-2 border-[#0a0a0a] dark:border-white bg-white dark:bg-[#0d1117]"></span>
-          <div class="card p-5">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div class="flex items-center gap-2">
-                <span class="font-semibold">${fmtTime(snap.at)}</span>
-                ${snap.profile.isPrivate ? '<span class="chip chip-idle">private · avatar only</span>' : ''}
-              </div>
-              ${snap.changeCount > 0
-                ? `<span class="chip chip-error">${snap.changeCount} change${snap.changeCount === 1 ? '' : 's'}</span>`
-                : `<span class="chip chip-ok">No changes</span>`}
-            </div>
-            ${snap.changeCount > 0 ? `<div class="flex flex-col gap-4">${snap.changes.map((c) => changeItem(username, c)).join('')}</div>` : ''}
-            ${renderStories(username, snap.stories)}
-          </div>
-        </div>
-      `).join('')}
+    <div class="overflow-x-auto w-full border border-[#eaecf0] dark:border-[#2a3441] rounded-lg">
+      <table class="w-full text-left border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-[#eaecf0] dark:border-[#2a3441] bg-[#f9fafb] dark:bg-[#1a212b]">
+            <th class="p-3 font-semibold text-[#5f5f5f] dark:text-[#a8b3c0] whitespace-nowrap min-w-[140px] w-[140px]">Date & Time</th>
+            <th class="p-3 font-semibold text-[#5f5f5f] dark:text-[#a8b3c0] min-w-[200px]">Activity & Changes</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[#eaecf0] dark:divide-[#2a3441] bg-white dark:bg-[#1c2430]">
+          ${filtered.map((snap) => `
+            <tr class="hover:bg-[#f9fafb] dark:hover:bg-[#202835] transition-colors fade-in">
+              <td class="p-3 align-top whitespace-nowrap text-[#8e8e93]">
+                ${fmtTime(snap.at)}
+              </td>
+              <td class="p-3 align-top">
+                <div class="flex flex-col gap-3">
+                  ${snap.changeCount > 0 ? `<div class="flex flex-col gap-3">${snap.changes.map((c) => changeItem(username, c)).join('')}</div>` : ''}
+                  ${renderStories(username, snap.stories)}
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
     </div>`;
 }
 
