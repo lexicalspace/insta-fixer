@@ -13,6 +13,7 @@ import { MODE } from './cost/cost-manager.js';
 import { cleanupOldMedia } from './retention.js';
 import { buildBackupArchive } from './backup.js';
 import { syncToHF, deleteFromHF, restoreFromHF, hfEnabled, createSyncDebouncer } from './hf.js';
+import { restoreFromBucket, syncToBucket, isBucketConfigured } from './bucket.js';
 import { sendTelegram, telegramConfigured } from './telegram.js';
 
 const MEDIA_USER_RE = /^[a-zA-Z0-9._-]+$/;

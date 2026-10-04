@@ -1,5 +1,6 @@
 import { poll } from './poller.js';
 import { syncToHF, hfEnabled } from './hf.js';
+import { syncToBucket, isBucketConfigured } from './bucket.js';
 import { sendTelegram, buildChangeAlert, buildDigest, shouldSendDigest, telegramConfigured } from './telegram.js';
 
 export async function pollAndNotify(store, config, { force = false } = {}) {

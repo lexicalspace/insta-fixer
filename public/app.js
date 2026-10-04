@@ -1340,6 +1340,16 @@ async function renderDataPage() {
       ` : `
         <p class="text-sm text-[#ff5530]">Hugging Face is not configured. Set HF_TOKEN and HF_DATASET (e.g. yourname/instagram-monitor) to enable.</p>
       `}
+
+    </section>
+    <section class="card p-6">
+      <h2 class="text-lg font-bold mb-1">Bucket Sync (S3)</h2>
+      <p class="text-sm text-[#8e8e93] mb-4">Data is uploaded to your S3-compatible storage bucket after every successful poll, giving you an independent backup of all state.</p>
+      ${status.bucketConfigured ? `
+        <button id="bucket-sync-btn" class="btn-pill btn-primary">Sync to Bucket</button>
+      ` : `
+        <p class="text-sm text-[#ff5530]">Bucket sync is not configured. Set BUCKET_NAME and AWS credentials in .env to enable.</p>
+      `}
     </section>`;
 
   const usage = await api('/api/data/usage');
@@ -1395,13 +1405,30 @@ async function renderDataPage() {
       hfBtn.disabled = true;
       hfBtn.textContent = 'Syncing…';
       try {
-        const r = await api('/api/hf/sync', { method: 'POST' });
-        showToast(r.errors?.length ? `Synced with ${r.errors.length} error(s).` : `Synced ${r.uploaded} file(s) to HF.`);
-        await refresh();
+        await api('/api/sync', { method: 'POST' });
+        showToast('HF Sync completed.');
       } catch (err) {
-        showToast(err.message, false);
+        showToast('HF Sync failed: ' + err.message);
+      } finally {
         hfBtn.disabled = false;
         hfBtn.textContent = 'Sync now';
+      }
+    });
+  }
+
+  const bucketBtn = $('#bucket-sync-btn');
+  if (bucketBtn) {
+    bucketBtn.addEventListener('click', async () => {
+      bucketBtn.disabled = true;
+      bucketBtn.textContent = 'Syncing to Bucket…';
+      try {
+        await api('/api/sync-bucket', { method: 'POST' });
+        showToast('Successfully synced to Bucket.');
+      } catch (err) {
+        showToast('Bucket Sync failed: ' + err.message);
+      } finally {
+        bucketBtn.disabled = false;
+        bucketBtn.textContent = 'Sync to Bucket';
       }
     });
   }
