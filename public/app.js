@@ -1039,7 +1039,21 @@ async function renderSpherePage() {
       <h2 class="text-lg font-bold mb-4">API Configuration</h2>
       <p class="text-sm text-[#8e8e93] mb-4">Set your limits, billing cycle reset dates (e.g. 15th of the month), and usage overrides for auto-detected APIs.</p>
       ${providerSettingsHtml}
-    </section>`;
+    </section>` + `
+    <!-- Logs Section -->
+    <section class="card p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold capitalize text-[#1a1a1a] dark:text-white">System Console Logs</h2>
+        <select id="log-month-select" class="input !py-1 !text-sm w-40 bg-white dark:bg-[#1a222c]">
+          <option value="">Loading...</option>
+        </select>
+      </div>
+      <div class="bg-[#1a222c] text-[#a8b3c0] p-4 rounded-lg font-mono text-xs h-64 overflow-y-auto whitespace-pre-wrap" id="log-console">Loading logs...</div>
+      <div class="mt-3 flex justify-end">
+        <button id="refresh-logs-btn" class="btn-pill btn-secondary !py-1.5 !px-4 text-sm">Refresh Logs</button>
+      </div>
+    </section>
+`;
 
   app.querySelectorAll('.save-api-cfg').forEach(btn => {
     btn.addEventListener('click', async (e) => {
@@ -1068,6 +1082,58 @@ async function renderSpherePage() {
       }
     });
   });
+
+  const logSelect = document.getElementById('log-month-select');
+  const logConsole = document.getElementById('log-console');
+  const refreshBtn = document.getElementById('refresh-logs-btn');
+  
+  async function loadLogMonths() {
+    if (!logSelect) return;
+    try {
+      const res = await fetch('/api/logs');
+      if (res.ok) {
+        const months = await res.json();
+        logSelect.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join('');
+        if (months.length > 0) {
+          loadLogsForMonth(months[0]);
+        } else {
+          logSelect.innerHTML = '<option value="">No logs</option>';
+          logConsole.textContent = 'No log files found.';
+        }
+      }
+    } catch (err) {
+      if (logConsole) logConsole.textContent = 'Failed to load log history: ' + err.message;
+    }
+  }
+  
+  async function loadLogsForMonth(month) {
+    if (!month || !logConsole) return;
+    try {
+      logConsole.textContent = 'Loading logs...';
+      const res = await fetch(`/api/logs/${month}`);
+      if (res.ok) {
+        const text = await res.text();
+        logConsole.textContent = text || 'No logs recorded for this month.';
+        logConsole.scrollTop = logConsole.scrollHeight; // Auto-scroll to bottom
+      }
+    } catch (err) {
+      logConsole.textContent = 'Error loading logs: ' + err.message;
+    }
+  }
+  
+  if (logSelect) {
+    logSelect.addEventListener('change', (e) => loadLogsForMonth(e.target.value));
+  }
+  
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      if (logSelect && logSelect.value) loadLogsForMonth(logSelect.value);
+      else loadLogMonths();
+    });
+  }
+  
+  loadLogMonths();
+
 }
 
 async function renderConfigPage() {

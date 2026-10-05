@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
 import express from 'express';
+import { initLogger, wrapConsole } from './logger.js';
 import { loadConfig } from './config.js';
 import { Store } from './store.js';
 import { mediaContentType } from './stores/base-store.js';
@@ -582,11 +583,32 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     }
   });
 
+  
+  app.get('/api/logs', requireAuth, (req, res) => {
+    import('./logger.js').then(logger => {
+      res.json(logger.listLogMonths());
+    });
+  });
+
+  app.get('/api/logs/:month', requireAuth, (req, res) => {
+    import('./logger.js').then(logger => {
+      const parts = req.params.month.split('-');
+      if (parts.length === 2) {
+        res.send(logger.getLogsForMonth(parts[0], parts[1]));
+      } else {
+        res.status(400).send('Invalid month format. Use YYYY-MM');
+      }
+    });
+  });
+
   return app;
 }
 
 export async function main() {
   const config = loadConfig();
+  initLogger(config.dataDir);
+  wrapConsole();
+  
   const useSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
   
   let store;
