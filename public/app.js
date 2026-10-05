@@ -998,7 +998,13 @@ async function renderSpherePage() {
 
       return `
         <div class="mb-4 last:mb-0">
-          <h3 class="font-bold text-md capitalize text-[#1a1a1a] dark:text-white mb-2">${name}</h3>
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-bold text-md capitalize text-[#1a1a1a] dark:text-white">${name}</h3>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" class="sr-only peer toggle-api-cfg" data-provider="${name}" ${p.enabled !== false ? 'checked' : ''}>
+              <div class="w-9 h-5 bg-[#eaecf0] peer-focus:outline-none rounded-full peer dark:bg-[#2a3441] peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-[#1ba673]"></div>
+            </label>
+          </div>
           <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
               <label class="text-[10px] uppercase font-semibold text-[#8e8e93] block mb-1">Monthly Limit (Units)</label>
@@ -1592,7 +1598,13 @@ async function renderQuotaPage() {
       html += `
         <div class="card p-5">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="font-bold text-lg capitalize text-[#1a1a1a] dark:text-white">${name}</h3>
+            <div class="flex items-center gap-3">
+              <h3 class="font-bold text-lg capitalize text-[#1a1a1a] dark:text-white">${name}</h3>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" class="sr-only peer toggle-api-cfg" data-provider="${name}" ${p.enabled !== false ? 'checked' : ''}>
+                <div class="w-9 h-5 bg-[#eaecf0] peer-focus:outline-none rounded-full peer dark:bg-[#2a3441] peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-[#1ba673]"></div>
+              </label>
+            </div>
             <span class="${chipClass.includes('chip') ? 'chip ' + chipClass : chipClass}">${chipText}</span>
           </div>
           <div class="mb-2 flex justify-between text-sm">
@@ -1873,3 +1885,26 @@ window.closeProfileDossier = () => {
     setTimeout(() => modal.remove(), 300);
   }
 };
+
+  document.addEventListener('change', async (e) => {
+    if (e.target.matches('.toggle-api-cfg')) {
+      const provider = e.target.getAttribute('data-provider');
+      const enabled = e.target.checked;
+      if (enabled) {
+        showToast(`Warning: ${provider} is now enabled and will be used for polling.`);
+      } else {
+        showToast(`${provider} is now disabled and will NOT be used for polling.`);
+      }
+      try {
+        const res = await fetch(`/api/config/providers/${provider}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled })
+        });
+        if (!res.ok) throw new Error('Failed to update API toggle');
+      } catch (err) {
+        showToast('Error: ' + err.message);
+        e.target.checked = !enabled; // revert
+      }
+    }
+  });

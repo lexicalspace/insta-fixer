@@ -331,6 +331,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   app.get('/api/config/providers', requireAuth, (req, res) => {
     const limits = stack.costManager.limits;
     const doc = store.readJson('usage.json', { providers: {} });
+    const cfg = store.getConfig();
     const out = {};
     for (const [name, lim] of Object.entries(limits)) {
       if (name === 'apify' && !config.apifyToken) continue;
@@ -340,12 +341,14 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       if (name === 'llm' && !process.env.ANTHROPIC_AUTH_TOKEN) continue;
       
       const usageUnits = doc.providers[name]?.month?.units || 0;
+      const enabled = cfg.providerEnabled?.[name] ?? config.providerEnabled?.[name] ?? true;
       out[name] = {
         monthlyUnits: lim.monthlyUnits,
         resetDay: lim.resetDay || 1,
         startDate: lim.startDate || "",
         endDate: lim.endDate || "",
-        currentUsage: usageUnits
+        currentUsage: usageUnits,
+        enabled: enabled
       };
     }
     res.json(out);
@@ -354,7 +357,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   app.post('/api/config/providers/:provider', requireAuth, async (req, res) => {
     try {
       const provider = req.params.provider;
-      const { monthlyUnits, resetDay, startDate, endDate, currentUsage } = req.body;
+      const { monthlyUnits, resetDay, startDate, endDate, currentUsage, enabled } = req.body;
       
       const cfg = store.getConfig();
       cfg.providerLimits = cfg.providerLimits || {};
@@ -363,7 +366,13 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       if (resetDay !== undefined) cfg.providerLimits[provider].resetDay = Number(resetDay);
       if (startDate !== undefined) cfg.providerLimits[provider].startDate = startDate;
       if (endDate !== undefined) cfg.providerLimits[provider].endDate = endDate;
-      store.setConfig({ providerLimits: cfg.providerLimits });
+      
+      if (enabled !== undefined) {
+        cfg.providerEnabled = cfg.providerEnabled || {};
+        cfg.providerEnabled[provider] = enabled;
+      }
+      
+      store.setConfig({ providerLimits: cfg.providerLimits, providerEnabled: cfg.providerEnabled });
 
 
       if (currentUsage !== undefined) {

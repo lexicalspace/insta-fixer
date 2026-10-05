@@ -179,7 +179,9 @@ export class CostManager {
     const base = { remainingDay, remainingMonth, ceiling: ceilingMonth, mode: effMode };
 
     if (doc.killSwitch) return { ok: false, reason: DENY.KILL_SWITCH, ...base };
-    if (this.config.providerEnabled && this.config.providerEnabled[provider] === false) {
+    const cfg = this.repo.store.getConfig();
+    const enabled = cfg.providerEnabled?.[provider] ?? (this.config.providerEnabled && this.config.providerEnabled[provider]);
+    if (enabled === false) {
       return { ok: false, reason: DENY.DISABLED, ...base };
     }
     const allowedTiers = MODE_TIERS[effMode] || MODE_TIERS[MODE.MAX_FREE];
@@ -284,6 +286,7 @@ export class CostManager {
         remainingMonth: Math.max(0, ceiling - state.month.units),
         throttleFactor: this.throttleFactor(name, { now }),
         forecast: forecastExhaustion(state.month, ceiling, now),
+        enabled: this.repo.store.getConfig().providerEnabled?.[name] ?? (this.config.providerEnabled && this.config.providerEnabled[name] !== false),
       };
     }
     return { mode, killSwitch: !!doc.killSwitch, providers };
