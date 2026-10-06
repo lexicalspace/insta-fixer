@@ -1169,6 +1169,7 @@ async function renderConfigPage() {
 
   $('#main').innerHTML = `
     ${pageHeader('Config', 'Profiles, polling intervals and alerts.')}
+    <section class="card p-6 mb-6">
       <h2 class="text-lg font-bold mb-4">Add a profile</h2>
       <form id="add-profile-form" class="flex flex-col gap-3">
         <div class="flex flex-col sm:flex-row gap-3">
