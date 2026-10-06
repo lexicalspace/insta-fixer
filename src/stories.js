@@ -73,7 +73,8 @@ export async function fetchStories(username, config) {
 
   let raw;
   try {
-    raw = await runActorSync(actor, input, config.apifyToken);
+    const token = config.storiesToken || config.apifyToken;
+    raw = await runActorSync(actor, input, token);
   } catch (err) {
     throw new Error(`stories: ${err.message}`);
   }

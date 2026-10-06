@@ -13,6 +13,7 @@ export function loadConfig() {
     apifyToken: process.env.APIFY_TOKEN || '',
     apifyActor: process.env.APIFY_ACTOR || 'apify/instagram-scraper',
     storiesActor: process.env.APIFY_STORIES_ACTOR || '',
+    storiesToken: process.env.APIFY_STORIES_TOKEN || '',
     storiesProxy: process.env.APIFY_STORIES_PROXY || '',
     instagramSession: process.env.INSTAGRAM_SESSION || '',
     pollIntervalHours: Number(process.env.POLL_INTERVAL_HOURS) || 1,
