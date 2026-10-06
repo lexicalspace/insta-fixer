@@ -482,6 +482,17 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     archive.on('error', () => res.destroy());
   });
 
+  
+  app.post('/api/sync-bucket', requireAuth, async (req, res) => {
+    if (!isBucketConfigured()) return res.status(400).json({ error: 'Bucket not configured.' });
+    try {
+      await syncToBucket(store.dir, store.dataDir || store.dir);
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/hf/sync', requireAuth, async (req, res) => {
     if (!hfEnabled(config)) {
       return res.status(400).json({ error: 'HF not configured. Set HF_TOKEN and HF_DATASET.' });

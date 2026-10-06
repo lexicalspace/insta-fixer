@@ -1477,7 +1477,7 @@ async function renderDataPage() {
       hfBtn.disabled = true;
       hfBtn.textContent = 'Syncing…';
       try {
-        await api('/api/sync', { method: 'POST' });
+        await api('/api/hf/sync', { method: 'POST' });
         showToast('HF Sync completed.');
       } catch (err) {
         showToast('HF Sync failed: ' + err.message);
