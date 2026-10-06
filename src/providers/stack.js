@@ -6,6 +6,7 @@ import { RapidApiProvider } from './rapidapi-provider.js';
 import { BrightDataProvider } from './brightdata-provider.js';
 import { LobstrProvider } from './lobstr-provider.js';
 import { ProviderRouter } from './router.js';
+import { FEATURE } from './provider-interface.js';
 
 /**
  * Assembles the cost/provider stack.
@@ -87,9 +88,27 @@ export function createStack(store, config, { runner = null, storiesFetcher = nul
     }
   ].map(r => new RapidApiProvider({ ...config, rapidapi: { ...config.rapidapi, ...r } })) : [new RapidApiProvider(config)];
 
+  const apifyProviders = [];
+  if (config.apifyToken || !config.storiesToken) {
+    apifyProviders.push(new ApifyProvider(config, {
+      name: 'apify',
+      features: [FEATURE.PROFILE, ...(!config.storiesToken && config.storiesActor ? [FEATURE.STORIES] : [])],
+      enabled: !!config.apifyToken,
+      ...apifyOpts
+    }));
+  }
+  if (config.storiesToken && config.storiesActor) {
+    apifyProviders.push(new ApifyProvider(config, {
+      name: 'apify-stories',
+      features: [FEATURE.STORIES],
+      enabled: true,
+      ...apifyOpts
+    }));
+  }
+
   const list = providers || [
     ...rapidProviders,
-    new ApifyProvider(config, apifyOpts),
+    ...apifyProviders,
     new BrightDataProvider(config),
     new LobstrProvider(config),
   ];

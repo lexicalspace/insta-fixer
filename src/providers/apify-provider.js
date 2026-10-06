@@ -12,13 +12,13 @@ import { InstagramProvider, FEATURE, TIER, providerResult, toProviderError } fro
  * pay-per-result (~300 free/month, then ~$2.70/1000).
  */
 export class ApifyProvider extends InstagramProvider {
-  constructor(config, { runner = runActorSync, storiesFetcher = fetchStories } = {}) {
+  constructor(config, { name = 'apify', features, enabled, runner = runActorSync, storiesFetcher = fetchStories } = {}) {
     super({
-      name: 'apify',
+      name,
       tier: TIER.LOW_COST,
       unitCostUsd: 0.0027,
-      features: [FEATURE.PROFILE, ...(config?.storiesActor ? [FEATURE.STORIES] : [])],
-      enabled: !!config?.apifyToken,
+      features: features || [FEATURE.PROFILE, ...(config?.storiesActor ? [FEATURE.STORIES] : [])],
+      enabled: enabled !== undefined ? enabled : !!config?.apifyToken,
     });
     this.config = config;
     this.runner = runner;

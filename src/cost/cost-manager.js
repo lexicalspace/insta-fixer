@@ -59,6 +59,13 @@ export const DEFAULT_LIMITS = {
     dailyUnits: Math.floor(1851 / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()), // Dynamically divided by days in current month
     monthlyUnits: 1851,
   },
+  'apify-stories': {
+    tier: TIER.LOW_COST,
+    unitCostUsd: 0.0027,
+    freeUnitsPerMonth: 1851,
+    dailyUnits: Math.floor(1851 / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()),
+    monthlyUnits: 1851,
+  },
   rapidapi: {
     tier: TIER.FREE,
     unitCostUsd: 0,

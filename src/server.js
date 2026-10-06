@@ -344,6 +344,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     const out = {};
     for (const [name, lim] of Object.entries(limits)) {
       if (name === 'apify' && !config.apifyToken) continue;
+      if (name === 'apify-stories' && !config.storiesToken) continue;
       if (name === 'rapidapi' && !config.rapidapi.key) continue;
       if (name === 'brightdata' && !config.brightdata.apiKey) continue;
       if (name === 'lobstr' && !config.lobstr.apiKey) continue;
