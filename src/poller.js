@@ -175,11 +175,26 @@ export function profileInterval(profile, config, throttleFactor = 1) {
   return base * throttleFactor;
 }
 
+export function getNextTime(lastMs, hours, anchorHour) {
+  if (!Number.isFinite(hours)) return Infinity;
+  const intervalMs = hours * 60 * 60 * 1000;
+  if (typeof anchorHour !== 'number') return lastMs + intervalMs;
+  
+  const d = new Date(lastMs);
+  d.setUTCHours(anchorHour, 0, 0, 0);
+  let baseMs = d.getTime();
+  if (baseMs > lastMs) baseMs -= 24 * 60 * 60 * 1000;
+  
+  const passed = Math.floor((lastMs - baseMs) / intervalMs);
+  return baseMs + (passed + 1) * intervalMs;
+}
+
 export function isDue(profile, config, now = Date.now(), throttleFactor = 1) {
   if (!profile.lastPolledAt) return true;
   const hours = profileInterval(profile, config, throttleFactor);
-  if (!Number.isFinite(hours)) return false; // quota exhausted — throttle is Infinity
-  return now - Date.parse(profile.lastPolledAt) >= hours * 60 * 60 * 1000;
+  if (!Number.isFinite(hours)) return false; // quota exhausted
+  const nextMs = getNextTime(Date.parse(profile.lastPolledAt), hours, config.batchAnchorHour);
+  return now >= nextMs;
 }
 
 export function storyInterval(profile, config, throttleFactor = 1) {
@@ -194,7 +209,8 @@ export function isStoryDue(profile, config, now = Date.now(), throttleFactor = 1
   if (!profile.lastStoryPollAt) return true;
   const hours = storyInterval(profile, config, throttleFactor);
   if (!Number.isFinite(hours)) return false;
-  return now - Date.parse(profile.lastStoryPollAt) >= hours * 60 * 60 * 1000;
+  const nextMs = getNextTime(Date.parse(profile.lastStoryPollAt), hours, config.batchAnchorHour);
+  return now >= nextMs;
 }
 
 function filterPostsByBackfill(posts, entry) {
@@ -221,6 +237,7 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
       username,
       args: { resultsLimit: MAX_POST_MEDIA },
       priority: PRIORITY.NORMAL,
+      allowedProviders: entry.allowedProviders,
     });
     profile = res.data;
   } else {
@@ -237,6 +254,7 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
       username,
       args: { resultsLimit: BACKFILL_LIMIT },
       priority: PRIORITY.CRITICAL,
+      allowedProviders: entry.allowedProviders,
     });
     profile = backfill.data;
   }
@@ -245,11 +263,17 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
     store.updateProfile(username, { isPrivate });
   }
 
-  // A skipped task carries the previous snapshot's value forward, so the diff
-  // reports "unchanged" rather than "avatar/all posts removed".
-  const profilePicFile = want(TASK.AVATAR)
-    ? await downloadTo(store, username, profile.profilePicUrl, 'avatar')
-    : (prev?.profile?.profilePicFile ?? null);
+  let profilePicFile = prev?.profile?.profilePicFile ?? null;
+  if (want(TASK.AVATAR)) {
+    if (result.provider === 'brightdata' && profilePicFile) {
+      // Ignore avatar updates from brightdata to avoid false positives (low-res vs HD mismatch)
+    } else if (profile.profilePicUrl) {
+      const dl = await downloadTo(store, username, profile.profilePicUrl, 'avatar');
+      if (dl) profilePicFile = dl;
+    } else {
+      profilePicFile = null;
+    }
+  }
 
   const knownIds = new Set((prev ? prev.posts : []).map((p) => p.id));
   const posts = [];
@@ -268,12 +292,14 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
 
   const stories = [];
   const storyChanged = [];
-  if (!isPrivate && entry.trackStories && want(TASK.STORIES) && providerOffers(stack, FEATURE.STORIES)) {
+  const shouldFetchStories = want(TASK.STORIES) || profile.hasStory;
+  if (!isPrivate && entry.trackStories && shouldFetchStories && providerOffers(stack, FEATURE.STORIES)) {
     try {
       const storyRes = await router.call(FEATURE.STORIES, {
         username,
         args: { maxItems: 20 },
         priority: PRIORITY.LOW,
+        allowedProviders: entry.allowedProviders,
       });
       const fresh = filterNewStories(storyRes.data || [], entry.seenStories);
       const newOnes = [];
@@ -496,7 +522,7 @@ function nextPollFor(entry, config, throttle, fallbackAt = null) {
   const from = Date.parse(entry.lastPolledAt || fallbackAt || new Date().toISOString());
   const hours = profileInterval(entry, config, throttle);
   if (!Number.isFinite(from) || !Number.isFinite(hours)) return null;
-  return new Date(from + hours * 60 * 60 * 1000).toISOString();
+  return new Date(getNextTime(from, hours, config.batchAnchorHour)).toISOString();
 }
 
 /**

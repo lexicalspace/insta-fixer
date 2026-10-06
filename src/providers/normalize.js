@@ -108,6 +108,7 @@ export function normalizeProfileShape(raw, { username = null } = {}) {
     externalUrl: (() => { const e = firstDefined(item.external_url, item.externalUrl, item.website, item.bio_links?.[0]?.url); return Array.isArray(e) ? e[0] : e; })(),
     isPrivate: !!firstDefined(item.is_private, item.isPrivate, item.private, false),
     verified: !!firstDefined(item.is_verified, item.isVerified, item.verified, false),
+    hasStory: !!firstDefined(item.has_story, item.hasStory, item.has_valid_stories, item.hasValidStories, false),
     profilePicUrl: firstDefined(
       item.profile_pic_url_hd, item.profilePicUrlHD, item.profile_pic_url_HD,
       item.profile_pic_url, item.profilePicUrl, item.profile_image_link,

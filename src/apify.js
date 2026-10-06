@@ -98,6 +98,7 @@ export function normalizeProfile(raw) {
     externalUrl: item.externalUrl ?? item.website ?? null,
     isPrivate: !!item.private || !!item.isPrivate,
     verified: !!item.verified,
+    hasStory: !!(item.hasStory || item.has_story || item.hasValidStories || item.has_valid_stories),
     profilePicUrl: item.profilePicUrlHD || item.profilePicUrl || item.profilePic || null,
     posts,
   };

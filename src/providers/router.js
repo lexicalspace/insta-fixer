@@ -59,7 +59,7 @@ export class ProviderRouter {
    * Providers that support `feature`, ordered cheapest-tier-first then by
    * health, each annotated with whether it may actually be used right now.
    */
-  candidates(feature, { units = null, now = new Date() } = {}) {
+  candidates(feature, { units = null, now = new Date(), allowedProviders = null } = {}) {
     const snapshot = this.costManager.repo.read();
     const list = this.providers
       .filter((p) => p.supports(feature))
@@ -70,7 +70,12 @@ export class ProviderRouter {
         const spend = this.costManager.canSpend(p.name, feature, estimate, { now });
         let usable = true;
         let reason = null;
-        if (!p.enabled) {
+        
+        // Match either the exact provider name (e.g. 'apify-stories') or its base prefix (e.g. 'rapidapi')
+        if (allowedProviders && !allowedProviders.includes(p.name) && !allowedProviders.includes(p.name.split('-')[0])) {
+          usable = false;
+          reason = 'account_override_disabled';
+        } else if (!p.enabled) {
           usable = false;
           reason = 'provider_disabled';
         } else if (!circuit.allowed) {
@@ -122,8 +127,8 @@ export class ProviderRouter {
    *
    * @returns {Promise<{data:any, units:number, provider:string, attempts:Array}>}
    */
-  async call(feature, { username, args = {}, priority = PRIORITY.NORMAL, units = null, now = new Date(), allowFallback = true } = {}) {
-    const ranked = this.candidates(feature, { units, now });
+  async call(feature, { username, args = {}, priority = PRIORITY.NORMAL, units = null, now = new Date(), allowFallback = true, allowedProviders = null } = {}) {
+    const ranked = this.candidates(feature, { units, now, allowedProviders });
     const attempts = [];
 
     for (let i = 0; i < ranked.length; i += 1) {

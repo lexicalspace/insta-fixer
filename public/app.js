@@ -2,6 +2,11 @@ const app = document.getElementById('app');
 const toastEl = document.getElementById('toast');
 
 let status = null;
+let privacyMode = localStorage.getItem("privacyMode") === "true";
+function obfuscate(username) {
+  if (!privacyMode || !username) return username;
+  return "***";
+}
 let historyData = null;
 let activeAccount = null;
 let timelineLimit = 5;
@@ -282,7 +287,7 @@ function profileStatCard(username) {
         <div class="flex items-center gap-3">
           <span class="flex h-12 w-12 items-center justify-center rounded-full bg-[#e7e9ee] dark:bg-[#262d38] font-bold text-[#8e8e93]">${avatarInitial(username)}</span>
           <div class="min-w-0">
-            <div class="font-bold truncate">@${escapeHtml(username)}</div>
+            <div class="font-bold truncate">@${escapeHtml(obfuscate(username))}</div>
             <div class="text-xs text-[#8e8e93]">no data yet</div>
           </div>
         </div>
@@ -299,7 +304,7 @@ function profileStatCard(username) {
           ? `<img class="h-12 w-12 rounded-full border border-[#eaecf0] dark:border-[#262d38] object-cover" src="${escapeHtml(mediaUrl(username, avatar))}" alt="" />`
           : `<span class="flex h-12 w-12 items-center justify-center rounded-full bg-[#e7e9ee] dark:bg-[#262d38] font-bold text-[#8e8e93]">${avatarInitial(username)}</span>`}
         <div class="min-w-0 flex-1">
-          <div class="font-bold truncate">@${escapeHtml(username)}</div>
+          <div class="font-bold truncate">@${escapeHtml(obfuscate(username))}</div>
           <div class="mt-1 flex flex-wrap gap-1">${privateBadge}${storiesBadge}</div>
         </div>
         <div class="text-right">
@@ -323,7 +328,7 @@ function profileStatCard(username) {
 }
 
 function renderProfileCards() {
-  const usernames = visibleAccounts();
+  const usernames = activeAccount ? [activeAccount] : [];
   if (!usernames.length) return '';
   return `
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -362,7 +367,7 @@ function renderLightbox() {
     : `<img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.username)}" />`;
   el.querySelector('.lb-media').innerHTML = media;
   el.querySelector('.lb-caption').innerHTML =
-    `@${escapeHtml(item.username)} · ${escapeHtml(item.kind)}${isVideo ? ' · video' : ''} · ${lightbox.index + 1} of ${lightbox.items.length}`;
+    `@${escapeHtml(obfuscate(item.username))} · ${escapeHtml(item.kind)}${isVideo ? ' · video' : ''} · ${lightbox.index + 1} of ${lightbox.items.length}`;
   const prev = el.querySelector('.lb-prev');
   const next = el.querySelector('.lb-next');
   prev.style.visibility = lightbox.items.length > 1 ? '' : 'hidden';
@@ -386,21 +391,23 @@ function profileBadges(profile) {
 }
 
 function renderProfilesNav() {
-  const profiles = status.profiles || [];
-  if (!activeAccount && profiles.length > 0) activeAccount = profiles[0].username;
+  const profiles = (status.profiles || []).filter(p => !p.isHidden);
+  if (activeAccount && !profiles.some(p => p.username === activeAccount)) {
+    activeAccount = null;
+  }
   timelineLimit = 5;
-  const items = [
-    ...profiles.map((p) => `
-      <button class="nav-pill ${activeAccount === p.username ? 'active' : ''}" data-account="${escapeHtml(p.username)}">
-        @${escapeHtml(p.username)}${p.isPrivate ? ' · private' : ''}
-      </button>`),
-  ];
+  const items = profiles.map((p) => `
+    <button class="nav-pill ${activeAccount === p.username ? 'active' : ''}" data-account="${escapeHtml(p.username)}">
+      @${escapeHtml(obfuscate(p.username))}${p.isPrivate ? ' · private' : ''}
+    </button>`);
   return `<div class="flex flex-wrap gap-2">${items.join('')}</div>`;
 }
 
 function visibleAccounts() {
   const profiles = status.profiles || [];
-  return profiles.some((p) => p.username === activeAccount) ? [activeAccount] : [];
+  return profiles
+    .filter(p => !p.isHidden)
+    .map(p => p.username);
 }
 
 function renderProfileTimeline(username) {
@@ -454,14 +461,17 @@ window.loadMoreTimeline = (username) => {
 };
 
 function renderHistorySections() {
-  const usernames = visibleAccounts();
+  const usernames = activeAccount ? [activeAccount] : [];
   if (!usernames.length) {
+    if (status.profiles && status.profiles.length > 0) {
+      return `<div class="text-[#8e8e93] text-sm py-8 text-center">Select a profile above to view its details.</div>`;
+    }
     return `<div class="text-[#8e8e93] text-sm py-8 text-center">No profiles yet. Add your first Instagram profile in Config.</div>`;
   }
   return usernames.map((username) => `
     <section class="card p-4 sm:p-6">
       <div class="flex items-center justify-between gap-3 mb-5">
-        <h2 class="text-lg font-bold truncate">@${escapeHtml(username)}</h2>
+        <h2 class="text-lg font-bold truncate">@${escapeHtml(obfuscate(username))}</h2>
       </div>
       ${renderHeatmap(username)}
       <div id="timeline-${escapeHtml(username)}">${renderProfileTimeline(username)}</div>
@@ -475,7 +485,7 @@ function leaderboardRows() {
   const now = Date.now();
   const cutoff = lbWindow === 'all' ? null : now - Number(lbWindow) * 86400000;
   const rows = [];
-  (status.profiles || []).forEach((p) => {
+  (status.profiles || []).filter(p => !p.isHidden).forEach((p) => {
     const snaps = ((historyData?.profiles || {})[p.username] || []).filter((s) => !cutoff || Date.parse(s.at) >= cutoff);
     let changes = 0;
     let posts = 0;
@@ -558,7 +568,7 @@ function leaderboardTable() {
                     <span class="inline-block h-2.5 w-2.5 rounded-full shrink-0" style="background:${accent}"></span>
                     ${renderAvatar(r.username, avatar, 'h-8 w-8 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb] dark:bg-[#141a23]')}
                     <div class="min-w-0">
-                      <div class="font-semibold truncate">@${escapeHtml(r.username)}${r.isPrivate ? ' <span class="text-[#8e8e93]">· private</span>' : ''}</div>
+                      <div class="font-semibold truncate">@${escapeHtml(obfuscate(r.username))}${r.isPrivate ? ' <span class="text-[#8e8e93]">· private</span>' : ''}</div>
                       <div class="text-[10px] text-[#8e8e93]">${r.snapCount} snapshot${r.snapCount === 1 ? '' : 's'}</div>
                     </div>
                   </div>
@@ -587,7 +597,7 @@ function pageHeader(title, subtitle) {
 }
 
 function renderFailedProfiles() {
-  const profiles = status.profiles || [];
+  const profiles = (status.profiles || []).filter(p => !p.isHidden);
   const failed = profiles.filter(p => p.lastPollError);
   
   if (!failed.length) {
@@ -622,7 +632,7 @@ function renderFailedProfiles() {
       <div class="flex flex-col gap-2">
         ${failed.map(p => `
           <div class="flex items-start justify-between gap-4 text-sm bg-white dark:bg-[#1c2430] p-3 rounded-lg border border-[#eaecf0] dark:border-[#2a3441]">
-            <div class="font-semibold text-[#1a1a1a] dark:text-white shrink-0">@${escapeHtml(p.username)}</div>
+            <div class="font-semibold text-[#1a1a1a] dark:text-white shrink-0">@${escapeHtml(obfuscate(p.username))}</div>
             <div class="text-[#ff5530] break-all">${escapeHtml(p.lastPollError)}</div>
             <div class="text-[#8e8e93] text-xs shrink-0">${p.lastPollErrorAt ? fmtTime(p.lastPollErrorAt) : ''}</div>
           </div>
@@ -675,9 +685,17 @@ function renderHeatmap(filterUsername = null) {
   
   const counts = {};
   let maxCount = 0;
-  const profilesToIterate = filterUsername && historyData.profiles[filterUsername]
-    ? { [filterUsername]: historyData.profiles[filterUsername] }
-    : historyData.profiles;
+  let profilesToIterate = {};
+  if (filterUsername && historyData.profiles[filterUsername]) {
+    profilesToIterate = { [filterUsername]: historyData.profiles[filterUsername] };
+  } else {
+    const visibleUsernames = new Set(visibleAccounts());
+    for (const u of Object.keys(historyData.profiles || {})) {
+      if (visibleUsernames.has(u)) {
+        profilesToIterate[u] = historyData.profiles[u];
+      }
+    }
+  }
   for (const p of Object.values(profilesToIterate)) {
     for (const snap of p) {
       if (!snap.at) continue;
@@ -844,13 +862,14 @@ function renderLeaderboardTable() {
 }
 
 function renderGraphsPage() {
-  const profiles = status?.profiles || [];
+  const profiles = (status?.profiles || []).filter(p => !p.isHidden);
   if (!profiles.length) {
     $('#main').innerHTML = `${pageHeader('Graphs', 'Visualize follower growth over time.')}<div class="card p-6 text-[#8e8e93]">No profiles tracked yet.</div>`;
     return;
   }
   
   if (!graphUser) graphUser = profiles[0].username;
+  else if (!profiles.some(p => p.username === graphUser)) graphUser = profiles[0].username;
 
   const userOpts = profiles.map(p => `<option value="${escapeHtml(p.username)}" ${graphUser === p.username ? 'selected' : ''}>@${escapeHtml(p.username)}</option>`).join('');
   
@@ -1138,30 +1157,60 @@ async function renderSpherePage() {
 
 async function renderConfigPage() {
   const s = status;
+  let providerConfig = {};
+  try { providerConfig = await api('/api/config/providers'); } catch {}
+  
+  const allProviders = Object.keys(providerConfig);
   
   const autoInterval = (p) => p.isPrivate ? p.batchIntervalHours || s.batchIntervalHours : s.intervalHours;
   const profiles = (s.profiles || []).map((p, idx) => {
     const avatar = latestAvatar(p.username);
     const accent = DRIVER_COLORS[idx % DRIVER_COLORS.length];
     const current = Number.isFinite(p.intervalHours) ? p.intervalHours : null;
+    
+    // Default allowed is all providers if not set
+    const allowed = p.allowedProviders || allProviders;
+    
     return `
-      <div class="flex items-center gap-4 rounded-2xl bg-[#f7f8fa] dark:bg-[#1c2430] p-3 border-l-4" style="border-left-color:${accent}">
-        ${renderAvatar(p.username, avatar, 'h-11 w-11 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb] dark:bg-[#141a23]')}
-        <div class="min-w-0 flex-1">
-          <div class="font-semibold truncate">@${escapeHtml(p.username)}</div>
-          <div class="mt-1 flex flex-wrap gap-1">${profileBadges(p)}</div>
-        </div>
-        <div class="flex flex-col items-end gap-1">
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] text-[#8e8e93]">every</span>
-            <select class="input !py-1 !px-2 text-xs interval-select" data-username="${escapeHtml(p.username)}">
-              <option value="auto" ${current === null ? 'selected' : ''}>auto (${autoInterval(p)}h)</option>
-              ${INTERVALS.map((h) => `<option value="${h}" ${current === h ? 'selected' : ''}>${h}h</option>`).join('')}
-            </select>
+      <div class="flex flex-col gap-2 rounded-2xl bg-[#f7f8fa] dark:bg-[#1c2430] p-3 border-l-4" style="border-left-color:${accent}">
+        <div class="flex items-center gap-4">
+          ${renderAvatar(p.username, avatar, 'h-11 w-11 rounded-full border border-[#eaecf0] object-cover bg-[#f9fafb] dark:bg-[#141a23]')}
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold truncate">@${escapeHtml(obfuscate(p.username))}</div>
+            <div class="mt-1 flex flex-wrap gap-1">${profileBadges(p)}</div>
           </div>
-          <div class="flex gap-2">
-            <button class="rename-profile btn-pill btn-tertiary !px-3 !py-1.5 text-xs" data-username="${escapeHtml(p.username)}">Rename</button>
-            <button class="remove-profile btn-pill btn-tertiary !px-3 !py-1.5 text-xs" data-username="${escapeHtml(p.username)}">Remove</button>
+          <div class="flex flex-col items-end gap-1">
+            <div class="flex items-center gap-2">
+              <label class="flex items-center gap-1 text-[10px] text-[#8e8e93] cursor-pointer" title="Hide this profile from UI unless 'Show hidden profiles' is checked">
+                <input type="checkbox" class="hidden-profile-check h-3 w-3" data-username="${escapeHtml(p.username)}" ${p.isHidden ? 'checked' : ''} />
+                Hidden
+              </label>
+              <span class="text-[10px] text-[#8e8e93]">every</span>
+              <select class="input !py-1 !px-2 text-xs interval-select" data-username="${escapeHtml(p.username)}">
+                <option value="auto" ${current === null ? 'selected' : ''}>auto (${autoInterval(p)}h)</option>
+                ${INTERVALS.map((h) => `<option value="${h}" ${current === h ? 'selected' : ''}>${h}h</option>`).join('')}
+              </select>
+            </div>
+            <div class="flex gap-2">
+              <button class="toggle-overrides-btn btn-pill btn-tertiary !px-3 !py-1.5 text-xs" data-username="${escapeHtml(p.username)}">APIs</button>
+              <button class="rename-profile btn-pill btn-tertiary !px-3 !py-1.5 text-xs" data-username="${escapeHtml(p.username)}">Rename</button>
+              <button class="remove-profile btn-pill btn-tertiary !px-3 !py-1.5 text-xs" data-username="${escapeHtml(p.username)}">Remove</button>
+            </div>
+          </div>
+        </div>
+        <div class="hidden api-overrides-panel p-2 mt-2 bg-white dark:bg-[#161b22] rounded-lg border border-[#eaecf0] dark:border-[#2a3441]" id="overrides-${escapeHtml(p.username)}">
+          <div class="text-[10px] font-bold uppercase tracking-wide text-[#8e8e93] mb-2">Allowed APIs for @${escapeHtml(obfuscate(p.username))}</div>
+          <div class="flex flex-wrap gap-3">
+            ${allProviders.map(prov => {
+              const isGloballyDisabled = !providerConfig[prov].enabled;
+              const isAllowed = allowed.includes(prov);
+              return `
+                <label class="flex items-center gap-1 text-xs cursor-pointer ${isGloballyDisabled ? 'opacity-50' : ''}" title="${isGloballyDisabled ? 'Globally disabled in Sphere/Quota tab' : ''}">
+                  <input type="checkbox" class="profile-api-check h-3 w-3" data-username="${escapeHtml(p.username)}" data-provider="${escapeHtml(prov)}" ${isAllowed ? 'checked' : ''} />
+                  ${escapeHtml(prov)}
+                </label>
+              `;
+            }).join('')}
           </div>
         </div>
       </div>`;
@@ -1206,12 +1255,25 @@ async function renderConfigPage() {
         </div>
         <button id="story-interval-save" class="btn-pill btn-secondary">Save stories interval</button>
       </div>
+      <div class="flex flex-wrap items-end gap-3 mb-4">
+        <div class="w-full sm:w-48">
+          <label class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0] block mb-2">Sync batches to hour</label>
+          <select class="input" id="batch-anchor-input">
+            ${Array.from({ length: 24 }, (_, h) => `<option value="${h}" ${s.batchAnchorHour === h ? 'selected' : ''}>${String(h).padStart(2, '0')}:00 UTC</option>`).join('')}
+          </select>
+        </div>
+        <button id="batch-anchor-save" class="btn-pill btn-secondary">Save batch sync</button>
+      </div>
       <span class="text-xs text-[#8e8e93]">Private accounts are privacy-pinged hourly (cheap, batched) and fully checked every ${s.batchIntervalHours} hour(s) unless overridden per profile. If one goes public it is pulled immediately and you get a Telegram alert.</span>
       <div class="mt-4 flex items-center gap-2">
         <input type="checkbox" id="poll-startup-check" class="h-4 w-4 rounded border-[#eaecf0] dark:border-[#2a3441] text-[#1ba673] focus:ring-[#1ba673]" ${s.pollOnStartup ? "checked" : ""}>
         <label for="poll-startup-check" class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0]">Run poll immediately on app restart</label>
-
       </div>
+      <div class="mt-4 flex items-center gap-2">
+        <input type="checkbox" id="privacy-mode-check" class="h-4 w-4 rounded border-[#eaecf0] dark:border-[#2a3441] text-[#1ba673] focus:ring-[#1ba673]" ${privacyMode ? "checked" : ""}>
+        <label for="privacy-mode-check" class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0]">Enable Privacy Mode (hide usernames with asterisks)</label>
+      </div>
+      
     </section>
 
     <section class="card p-6 mb-6">
@@ -1258,7 +1320,7 @@ async function renderConfigPage() {
       });
       input.value = '';
       status.profiles = r.profiles;
-      activeAccount = 'all';
+      activeAccount = r.username;
       showToast(`Added @${r.username}.`);
       await refresh();
     } catch (err) {
@@ -1270,21 +1332,50 @@ async function renderConfigPage() {
     try {
       const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ intervalHours: Number($('#interval-input').value), pollOnStartup: $('#poll-startup-check').checked }) });
       status.intervalHours = r.intervalHours;
-      await refresh();
-
+      status.pollOnStartup = r.pollOnStartup;
       showToast(`Public poll interval set to every ${r.intervalHours} hour(s).`);
     } catch (err) {
       showToast(err.message, false);
     }
   });
 
+  $('#privacy-mode-check').addEventListener('change', async (e) => {
+    privacyMode = e.target.checked;
+    localStorage.setItem('privacyMode', privacyMode);
+    renderPage();
+  });
+
+
+    app.querySelectorAll('.hidden-profile-check').forEach((chk) => {
+    chk.addEventListener('change', async () => {
+      const username = chk.dataset.username;
+      const isHidden = chk.checked;
+      try {
+        const r = await api(`/api/config/profiles/${encodeURIComponent(username)}`, { method: 'PATCH', body: JSON.stringify({ isHidden }) });
+        status.profiles = status.profiles.map((p) => (p.username === username ? r.profile : p));
+        showToast(`@${username} is now ${isHidden ? 'hidden' : 'visible'}.`);
+      } catch (err) {
+        showToast(err.message, false);
+        chk.checked = !isHidden;
+      }
+    });
+  });
+
   $('#story-interval-save').addEventListener('click', async () => {
     try {
       const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ storyIntervalHours: Number($('#story-interval-input').value) }) });
       status.storyIntervalHours = r.storyIntervalHours;
-      await refresh();
-
       showToast(`Stories poll interval set to every ${r.storyIntervalHours} hour(s).`);
+    } catch (err) {
+      showToast(err.message, false);
+    }
+  });
+
+  $('#batch-anchor-save').addEventListener('click', async () => {
+    try {
+      const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ batchAnchorHour: Number($('#batch-anchor-input').value) }) });
+      status.batchAnchorHour = r.batchAnchorHour;
+      showToast(`Batch sync hour saved.`);
     } catch (err) {
       showToast(err.message, false);
     }
@@ -1325,9 +1416,49 @@ async function renderConfigPage() {
         const r = await api(`/api/config/profiles/${encodeURIComponent(username)}`, { method: 'PATCH', body: JSON.stringify({ intervalHours: value }) });
         status.profiles = status.profiles.map((p) => (p.username === username ? r.profile : p));
         showToast(`@${username} poll interval updated.`);
-        await refresh();
       } catch (err) {
         showToast(err.message, false);
+      }
+    });
+  });
+
+  app.querySelectorAll('.toggle-overrides-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const username = btn.dataset.username;
+      const panel = document.getElementById(`overrides-${escapeHtml(username)}`);
+      if (panel) {
+        panel.classList.toggle('hidden');
+      }
+    });
+  });
+
+  app.querySelectorAll('.profile-api-check').forEach((chk) => {
+    chk.addEventListener('change', async () => {
+      const username = chk.dataset.username;
+      const provider = chk.dataset.provider;
+      const isAllowed = chk.checked;
+      
+      const profile = status.profiles.find(p => p.username === username);
+      if (!profile) return;
+      
+      const allowed = new Set(profile.allowedProviders || Object.keys(await api('/api/config/providers')));
+      if (isAllowed) allowed.add(provider);
+      else allowed.delete(provider);
+      
+      const allowedArr = Array.from(allowed);
+      
+      const isGloballyDisabled = chk.closest('label').classList.contains('opacity-50');
+      if (isAllowed && isGloballyDisabled) {
+         showToast(`Warning: ${provider} is allowed for this profile, but it is globally disabled.`, false);
+      }
+
+      try {
+        const r = await api(`/api/config/profiles/${encodeURIComponent(username)}`, { method: 'PATCH', body: JSON.stringify({ allowedProviders: allowedArr }) });
+        status.profiles = status.profiles.map((p) => (p.username === username ? r.profile : p));
+        if (!(isAllowed && isGloballyDisabled)) showToast(`API overrides updated for @${username}.`);
+      } catch (err) {
+        showToast(err.message, false);
+        chk.checked = !isAllowed;
       }
     });
   });
@@ -1339,7 +1470,7 @@ async function renderConfigPage() {
       try {
         const r = await api(`/api/config/profiles/${encodeURIComponent(username)}`, { method: 'DELETE' });
         status.profiles = r.profiles;
-        if (activeAccount === username) activeAccount = 'all';
+        if (activeAccount === username) activeAccount = null;
         showToast(`Removed @${username}.`);
         await refresh();
       } catch (err) {
@@ -1445,11 +1576,13 @@ async function renderDataPage() {
     </section>`;
 
   const usage = await api('/api/data/usage');
+  const visibleUsernames = new Set(visibleAccounts());
+  const visibleUsage = usage.profiles.filter(p => visibleUsernames.has(p.username));
   $('#usage-box').innerHTML = `
     <div class="flex flex-col gap-2">
-      ${usage.profiles.map((p) => `
+      ${visibleUsage.map((p) => `
         <div class="flex items-center justify-between rounded-xl bg-[#f7f8fa] dark:bg-[#1c2430] px-4 py-3">
-          <span class="font-semibold">@${escapeHtml(p.username)}</span>
+          <span class="font-semibold">@${escapeHtml(obfuscate(p.username))}</span>
           <span class="text-sm text-[#8e8e93]">${p.files} file${p.files === 1 ? '' : 's'} · ${fmtBytes(p.bytes)}</span>
         </div>`).join('')}
       <div class="flex items-center justify-between rounded-xl px-4 py-3 font-bold">
@@ -1458,8 +1591,8 @@ async function renderDataPage() {
       </div>
     </div>`;
 
-  $('#per-profile-downloads').innerHTML = (status.profiles || []).map((p) => `
-    <a class="btn-pill btn-tertiary justify-start w-full sm:w-auto" href="/api/backup/${encodeURIComponent(p.username)}">Download @${escapeHtml(p.username)} data</a>`).join('');
+  $('#per-profile-downloads').innerHTML = (status.profiles || []).filter(p => visibleUsernames.has(p.username)).map((p) => `
+    <a class="btn-pill btn-tertiary justify-start w-full sm:w-auto" href="/api/backup/${encodeURIComponent(p.username)}">Download @${escapeHtml(obfuscate(p.username))} data</a>`).join('');
 
   $('#retention-input').addEventListener('change', async () => {
     try {
@@ -1534,7 +1667,7 @@ async function renderGalleryPage() {
         <button class="btn-pill ${(gallery.kind || 'all') === k ? 'btn-primary' : 'btn-tertiary'} gallery-kind" data-kind="${k}">${label}</button>`).join('')}
       <select class="input !w-56" id="gallery-user">
         <option value="all">All profiles</option>
-        ${(status.profiles || []).map((p) => `<option value="${escapeHtml(p.username)}" ${gallery.user === p.username ? 'selected' : ''}>@${escapeHtml(p.username)}</option>`).join('')}
+        ${(status.profiles || []).filter(p => !p.isHidden).map((p) => `<option value="${escapeHtml(p.username)}" ${gallery.user === p.username ? 'selected' : ''}>@${escapeHtml(obfuscate(p.username))}</option>`).join('')}
       </select>
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" id="gallery-grid">
@@ -1545,8 +1678,10 @@ async function renderGalleryPage() {
   const user = gallery.user || 'all';
   const data = await api('/api/media/all');
   const items = data.items.filter((it) => (kind === 'all' || it.kind === kind) && (user === 'all' || it.username === user));
+  const visibleUsernames = new Set(visibleAccounts());
+  const visibleItems = items.filter(it => visibleUsernames.has(it.username));
   const grid = $('#gallery-grid');
-  if (!items.length) {
+  if (!visibleItems.length) {
     grid.innerHTML = `
       <div class="col-span-full empty-state">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
@@ -1554,7 +1689,7 @@ async function renderGalleryPage() {
         <p class="text-xs">Run a poll to start capturing avatars, posts and stories.</p>
       </div>`;
   } else {
-    grid.innerHTML = items.map((it, idx) => {
+    grid.innerHTML = visibleItems.map((it, idx) => {
       const isVideo = /\.(mp4|webm)$/i.test(it.url);
       const tile = isVideo
         ? `<video src="${escapeHtml(it.url)}" preload="metadata" muted loop playsinline class="aspect-square w-full object-cover group-hover:scale-105 transition-transform duration-200"></video>`
@@ -1563,7 +1698,7 @@ async function renderGalleryPage() {
       <button type="button" class="lb-open group relative block w-full overflow-hidden rounded-xl border border-[#eaecf0] dark:border-[#262d38] text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1456f0]" data-index="${idx}" aria-label="View media from @${escapeHtml(it.username)}">
         ${tile}
         <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
-          <div class="text-[10px] font-bold text-white truncate">@${escapeHtml(it.username)} · ${escapeHtml(it.kind)}${isVideo ? ' · video' : ''}</div>
+          <div class="text-[10px] font-bold text-white truncate">@${escapeHtml(obfuscate(it.username))} · ${escapeHtml(it.kind)}${isVideo ? ' · video' : ''}</div>
         </div>
         <span class="absolute top-1.5 right-1.5 inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-3.5 w-3.5"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
@@ -1573,7 +1708,7 @@ async function renderGalleryPage() {
   }
 
   grid.querySelectorAll('.lb-open').forEach((btn) => {
-    btn.addEventListener('click', () => openLightbox(items, Number(btn.dataset.index)));
+    btn.addEventListener('click', () => openLightbox(visibleItems, Number(btn.dataset.index)));
   });
 
   app.querySelectorAll('.gallery-kind').forEach((btn) => {
@@ -1752,6 +1887,13 @@ async function renderQuotaPage() {
 }
 
 async function renderPage() {
+  const isProtectedPage = ['config', 'data', 'sphere', 'quota'].includes(page);
+  
+  if (isProtectedPage) {
+    if (!status.passwordSet) return renderSetup();
+    if (status.locked) return renderLogin();
+  }
+
   if (page === 'leaderboard') return renderLeaderboardPage();
   if (page === 'graphs') return renderGraphsPage();
   if (page === 'sphere') return renderSpherePage();
@@ -1822,13 +1964,19 @@ async function refresh() {
     return renderSetup();
   }
   if (!historyData) historyData = await api('/api/history');
-  renderShell();
+  
+  if (!document.getElementById('sidebar')) {
+    renderShell();
+  } else {
+    renderPage();
+  }
+  
   lastStatusKey = statusFingerprint(status);
 }
 
 async function render() {
   historyData = null;
-  activeAccount = 'all';
+  activeAccount = null;
   page = 'dashboard';
   await refresh();
 }

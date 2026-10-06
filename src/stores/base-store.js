@@ -143,7 +143,7 @@ export class BaseStore {
   }
 
   _normalizeProfileEntry(entry) {
-    return {
+    const norm = {
       username: entry.username,
       addedAt: entry.addedAt || new Date().toISOString(),
       backfill: entry.backfill !== undefined ? !!entry.backfill : true,
@@ -154,6 +154,9 @@ export class BaseStore {
       lastPolledAt: entry.lastPolledAt || null,
       seenStories: Array.isArray(entry.seenStories) ? entry.seenStories : [],
     };
+    if (entry.isHidden !== undefined) norm.isHidden = !!entry.isHidden;
+    if (entry.allowedProviders !== undefined) norm.allowedProviders = entry.allowedProviders;
+    return norm;
   }
 
   addProfile(username, opts = {}) {

@@ -5,7 +5,7 @@ import { loadConfig } from './config.js';
 import { Store } from './store.js';
 import { mediaContentType } from './stores/base-store.js';
 import { hashPassword, verifyPassword, issueToken, verifyToken, sessionCookie, clearSessionCookie, parseCookies } from './auth.js';
-import { schedule, isDue, profileInterval, providerOffers } from './poller.js';
+import { schedule, isDue, profileInterval, providerOffers, getNextTime } from './poller.js';
 import { runCronCycle } from './cron-cycle.js';
 import { SupabasePollLock } from './stores/supabase-lock.js';
 import { createStack } from './providers/stack.js';
@@ -58,6 +58,18 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     return res.status(401).json({ error: 'Authentication required.' });
   }
 
+  function getVisibleProfiles(req) {
+    const cfg = store.getConfig();
+    const authed = isAuthed(req);
+    return (cfg.profiles || []).filter(p => authed || !p.isHidden);
+  }
+  function isVisibleUsername(req, username) {
+    const authed = isAuthed(req);
+    if (authed) return true;
+    const cfg = store.getConfig();
+    const p = (cfg.profiles || []).find(p => p.username === username);
+    return p && !p.isHidden;
+  }
   function isPollAllowed(req) {
     if (isAuthed(req)) return true;
     const header = req.get('x-poll-token');
@@ -76,10 +88,10 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     const now = Date.now();
     const throttle = stack.costManager.throttleFactor('apify');
     const activeConfig = { ...config, pollIntervalHours: cfg.intervalHours ?? config.pollIntervalHours, batchIntervalHours: cfg.batchIntervalHours ?? config.batchIntervalHours };
-    const profiles = (cfg.profiles || []).map((p) => {
+    const profiles = getVisibleProfiles(req).map((p) => {
       const intervalHours = profileInterval(p, activeConfig, throttle);
       const nextPollAt = p.lastPolledAt && Number.isFinite(intervalHours)
-        ? new Date(Date.parse(p.lastPolledAt) + intervalHours * 60 * 60 * 1000).toISOString()
+        ? new Date(getNextTime(Date.parse(p.lastPolledAt), intervalHours, activeConfig.batchAnchorHour)).toISOString()
         : null;
       return { ...p, intervalHours, nextPollAt, due: isDue(p, activeConfig, now, throttle) };
     });
@@ -87,12 +99,13 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     res.json({
       passwordSet,
       locked: passwordSet && !authed,
-      profiles: authed ? profiles : [],
+      profiles: profiles,
       pollOnStartup: cfg.pollOnStartup !== false,
 
       intervalHours: cfg.intervalHours || config.pollIntervalHours,
       storyIntervalHours: cfg.storyIntervalHours || cfg.intervalHours || config.pollIntervalHours,
       batchIntervalHours: config.batchIntervalHours,
+      batchAnchorHour: cfg.batchAnchorHour !== undefined ? cfg.batchAnchorHour : (config.batchAnchorHour || 0),
       privacyPing: true,
       storiesEnabled: providerOffers(stack, FEATURE.STORIES),
       cronMode: !!config.cronMode,
@@ -102,7 +115,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       lastPollAt: cfg.lastPollAt,
       lastPollStatus: cfg.lastPollStatus,
       lastPollError: cfg.lastPollError,
-      nextPollAt: cfg.lastPollAt ? new Date(Date.parse(cfg.lastPollAt) + (activeConfig.pollIntervalHours * (Number.isFinite(throttle) ? throttle : 1) * 60 * 60 * 1000)).toISOString() : null,
+      nextPollAt: cfg.lastPollAt ? new Date(getNextTime(Date.parse(cfg.lastPollAt), activeConfig.pollIntervalHours * (Number.isFinite(throttle) ? throttle : 1), activeConfig.batchAnchorHour)).toISOString() : null,
 
       totalSnapshots: cfg.totalSnapshots || 0,
       totalChanges: cfg.totalChanges || 0,
@@ -188,6 +201,13 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       }
       patch.storyIntervalHours = h;
     }
+    if (typeof body.batchAnchorHour === 'number') {
+      const h = body.batchAnchorHour;
+      if (!(h >= 0 && h <= 23)) {
+        return res.status(400).json({ error: 'batchAnchorHour must be between 0 and 23.' });
+      }
+      patch.batchAnchorHour = h;
+    }
     if (typeof body.retentionEnabled === 'boolean') patch.retentionEnabled = body.retentionEnabled;
     if (typeof body.retentionDays === 'number') {
       const d = body.retentionDays;
@@ -223,6 +243,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     const added = store.addProfile(username, {
       backfill: typeof body.backfill === 'boolean' ? body.backfill : undefined,
       trackStories: typeof body.trackStories === 'boolean' ? body.trackStories : undefined,
+      isHidden: typeof body.isHidden === 'boolean' ? body.isHidden : undefined,
     });
     if (!added) {
       return res.status(400).json({ error: `"${username}" is already tracked.` });
@@ -239,6 +260,8 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     const patch = {};
     if (typeof body.backfill === 'boolean') patch.backfill = body.backfill;
     if (typeof body.trackStories === 'boolean') patch.trackStories = body.trackStories;
+    if (typeof body.isHidden === 'boolean') patch.isHidden = body.isHidden;
+    if (Array.isArray(body.allowedProviders)) patch.allowedProviders = body.allowedProviders;
     if (typeof body.intervalHours === 'number') {
       const h = body.intervalHours;
       if (!(h >= 1 && h <= 168)) {
@@ -538,6 +561,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     try {
       for (const f of await store.listMedia(username)) {
         if (!isSafeMediaPath(f.username, f.name)) continue;
+        if (!visibleUsers.has(f.username)) continue;
         items.push({
           username: f.username,
           file: f.name,
@@ -554,11 +578,14 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     res.json({ items });
   });
 
-  app.get('/api/media/all', requireAuth, async (req, res) => {
+  app.get('/api/media/all', async (req, res) => {
+    const authed = isAuthed(req);
+    const visibleUsers = new Set(getVisibleProfiles(req).map(p => p.username));
     const items = [];
     try {
       for (const f of await store.listMedia()) {
         if (!isSafeMediaPath(f.username, f.name)) continue;
+        if (!visibleUsers.has(f.username)) continue;
         items.push({
           username: f.username,
           file: f.name,
@@ -575,18 +602,32 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
     res.json({ items });
   });
 
-  app.get('/api/history', requireAuth, (req, res) => {
+  app.get('/api/history', (req, res) => {
     const h = store.getHistory();
+    const authed = isAuthed(req);
+    if (!authed) {
+      const visibleUsers = new Set(getVisibleProfiles(req).map(p => p.username));
+      const filteredProfiles = {};
+      for (const u of Object.keys(h.profiles || {})) {
+        if (visibleUsers.has(u)) filteredProfiles[u] = h.profiles[u];
+      }
+      h.profiles = filteredProfiles;
+    }
+
     res.json(h);
   });
 
-  app.get('/api/history/:username', requireAuth, (req, res) => {
+  app.get('/api/history/:username', (req, res) => {
+    if (!isVisibleUsername(req, req.params.username)) return res.status(403).json({ error: 'Forbidden' });
+
     const h = store.getHistory();
     const list = h.profiles[req.params.username] || [];
     res.json({ username: req.params.username, snapshots: list });
   });
 
-  app.get('/api/media/:username/:file', requireAuth, async (req, res) => {
+  app.get('/api/media/:username/:file', async (req, res) => {
+    if (!isVisibleUsername(req, req.params.username)) return res.status(403).json({ error: 'Forbidden' });
+
     const { username, file } = req.params;
     if (!isSafeMediaPath(username, file)) {
       return res.status(400).json({ error: 'Invalid path.' });
