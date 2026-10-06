@@ -1189,7 +1189,7 @@ async function renderConfigPage() {
 
     <section class="card p-6 mb-6">
       <h2 class="text-lg font-bold mb-4">Poll interval</h2>
-      <div class="flex flex-wrap items-end gap-3">
+      <div class="flex flex-wrap items-end gap-3 mb-4">
         <div class="w-full sm:w-48">
           <label class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0] block mb-2">Public poll every</label>
           <select class="input" id="interval-input">
@@ -1197,8 +1197,15 @@ async function renderConfigPage() {
           </select>
         </div>
         <button id="interval-save" class="btn-pill btn-secondary">Save interval</button>
-        <span class="text-xs text-[#8e8e93]">Private accounts are privacy-pinged hourly (cheap, batched) and fully checked every ${s.batchIntervalHours} hour(s) unless overridden per profile. If one goes public it is pulled immediately and you get a Telegram alert.</span>
+        <div class="w-full sm:w-48">
+          <label class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0] block mb-2">Stories poll every</label>
+          <select class="input" id="story-interval-input">
+            ${INTERVALS.map((h) => `<option value="${h}" ${s.storyIntervalHours === h ? 'selected' : ''}>${h} hour${h === 1 ? '' : 's'}</option>`).join('')}
+          </select>
+        </div>
+        <button id="story-interval-save" class="btn-pill btn-secondary">Save stories interval</button>
       </div>
+      <span class="text-xs text-[#8e8e93]">Private accounts are privacy-pinged hourly (cheap, batched) and fully checked every ${s.batchIntervalHours} hour(s) unless overridden per profile. If one goes public it is pulled immediately and you get a Telegram alert.</span>
       <div class="mt-4 flex items-center gap-2">
         <input type="checkbox" id="poll-startup-check" class="h-4 w-4 rounded border-[#eaecf0] dark:border-[#2a3441] text-[#1ba673] focus:ring-[#1ba673]" ${s.pollOnStartup ? "checked" : ""}>
         <label for="poll-startup-check" class="text-sm font-semibold text-[#45515e] dark:text-[#a8b3c0]">Run poll immediately on app restart</label>
@@ -1265,6 +1272,18 @@ async function renderConfigPage() {
       await refresh();
 
       showToast(`Public poll interval set to every ${r.intervalHours} hour(s).`);
+    } catch (err) {
+      showToast(err.message, false);
+    }
+  });
+
+  $('#story-interval-save').addEventListener('click', async () => {
+    try {
+      const r = await api('/api/config', { method: 'POST', body: JSON.stringify({ storyIntervalHours: Number($('#story-interval-input').value) }) });
+      status.storyIntervalHours = r.storyIntervalHours;
+      await refresh();
+
+      showToast(`Stories poll interval set to every ${r.storyIntervalHours} hour(s).`);
     } catch (err) {
       showToast(err.message, false);
     }

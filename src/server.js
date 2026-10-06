@@ -91,6 +91,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
       pollOnStartup: cfg.pollOnStartup !== false,
 
       intervalHours: cfg.intervalHours || config.pollIntervalHours,
+      storyIntervalHours: cfg.storyIntervalHours || cfg.intervalHours || config.pollIntervalHours,
       batchIntervalHours: config.batchIntervalHours,
       privacyPing: true,
       storiesEnabled: providerOffers(stack, FEATURE.STORIES),
@@ -179,6 +180,13 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
         return res.status(400).json({ error: 'intervalHours must be between 1 and 168.' });
       }
       patch.intervalHours = h;
+    }
+    if (typeof body.storyIntervalHours === 'number') {
+      const h = body.storyIntervalHours;
+      if (!(h >= 1 && h <= 168)) {
+        return res.status(400).json({ error: 'storyIntervalHours must be between 1 and 168.' });
+      }
+      patch.storyIntervalHours = h;
     }
     if (typeof body.retentionEnabled === 'boolean') patch.retentionEnabled = body.retentionEnabled;
     if (typeof body.retentionDays === 'number') {

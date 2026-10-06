@@ -182,6 +182,21 @@ export function isDue(profile, config, now = Date.now(), throttleFactor = 1) {
   return now - Date.parse(profile.lastPolledAt) >= hours * 60 * 60 * 1000;
 }
 
+export function storyInterval(profile, config, throttleFactor = 1) {
+  const base = Number.isFinite(profile.storyIntervalHours)
+    ? profile.storyIntervalHours
+    : config.storyIntervalHours || profileInterval(profile, config, throttleFactor);
+  if (!Number.isFinite(throttleFactor) || throttleFactor <= 1) return base;
+  return base * throttleFactor;
+}
+
+export function isStoryDue(profile, config, now = Date.now(), throttleFactor = 1) {
+  if (!profile.lastStoryPollAt) return true;
+  const hours = storyInterval(profile, config, throttleFactor);
+  if (!Number.isFinite(hours)) return false;
+  return now - Date.parse(profile.lastStoryPollAt) >= hours * 60 * 60 * 1000;
+}
+
 function filterPostsByBackfill(posts, entry) {
   if (entry.backfill) return posts;
   if (!entry.addedAt) return posts;
@@ -196,18 +211,23 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
   // No subset requested = do everything (the whole-account poll path).
   const want = (t) => !tasks || tasks.has(t);
 
-  const res = await router.call(FEATURE.PROFILE, {
-    username,
-    args: { resultsLimit: MAX_POST_MEDIA },
-    priority: PRIORITY.NORMAL,
-  });
-  let profile = res.data;
-
-  const isPrivate = profile.isPrivate;
-
   const history = store.getHistory();
   const prevList = history.profiles[username] || [];
   const prev = prevList.length ? prevList[prevList.length - 1] : null;
+
+  let profile;
+  if (want(TASK.PROFILE)) {
+    const res = await router.call(FEATURE.PROFILE, {
+      username,
+      args: { resultsLimit: MAX_POST_MEDIA },
+      priority: PRIORITY.NORMAL,
+    });
+    profile = res.data;
+  } else {
+    profile = prev ? prev.profile : { isPrivate: entry.isPrivate };
+  }
+
+  const isPrivate = profile.isPrivate;
 
   const justWentPublic = !!prev && prev.profile?.isPrivate === true && isPrivate === false;
   if (justWentPublic) {
@@ -290,7 +310,10 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
   };
 
   store.saveSnapshot(username, snapshot);
-  store.updateProfile(username, { lastPolledAt: snapshot.at, lastPollError: null, lastPollErrorAt: null });
+  const updateInfo = { lastPollError: null, lastPollErrorAt: null };
+  if (want(TASK.PROFILE)) updateInfo.lastPolledAt = snapshot.at;
+  if (want(TASK.STORIES)) updateInfo.lastStoryPollAt = snapshot.at;
+  store.updateProfile(username, updateInfo);
   return { snapshot, storyChanged };
 }
 
@@ -350,31 +373,28 @@ export async function poll(store, config, { force = false, runner = runActorSync
   const pendingPings = [];
 
   for (const entry of profiles) {
-    const due = force || isDue(entry, config, now, throttle);
+    const pDue = force || isDue(entry, config, now, throttle);
+    const sDue = entry.trackStories && (force || isStoryDue(entry, config, now, throttle));
+    const due = pDue || sDue;
+
     if (!due) {
-      if (entry.isPrivate) {
-        // Hourly privacy ping is disabled to save requests.
-        // It will only be checked when fully due (e.g. every 8 hours).
-        results.push({
-          username: entry.username,
-          ok: true,
-          due: false,
-          throttleFactor: throttle,
-          nextPollAt: nextPollFor(entry, config, throttle),
-        });
-      } else {
-        results.push({
-          username: entry.username,
-          ok: true,
-          due: false,
-          throttleFactor: throttle,
-          nextPollAt: nextPollFor(entry, config, throttle),
-        });
-      }
+      results.push({
+        username: entry.username,
+        ok: true,
+        due: false,
+        throttleFactor: throttle,
+        nextPollAt: nextPollFor(entry, config, throttle),
+      });
       continue;
     }
+
+    let tasks = null;
+    if (!pDue && sDue) tasks = new Set([TASK.STORIES]);
+    else if (pDue && !sDue) tasks = new Set([TASK.PROFILE, TASK.AVATAR, TASK.POSTS]);
+    else tasks = new Set([TASK.PROFILE, TASK.AVATAR, TASK.POSTS, TASK.STORIES]);
+
     try {
-      const { snapshot, storyChanged } = await pollProfile(store, config, entry, ctx);
+      const { snapshot, storyChanged } = await pollProfile(store, config, entry, ctx, { tasks });
       polledCount += 1;
       totalChanges += snapshot.changeCount;
       results.push({
