@@ -180,7 +180,11 @@ export class CostManager {
 
     if (doc.killSwitch) return { ok: false, reason: DENY.KILL_SWITCH, ...base };
     const cfg = this.repo.store.getConfig();
-    const enabled = cfg.providerEnabled?.[provider] ?? (this.config.providerEnabled && this.config.providerEnabled[provider]);
+    const baseName = provider.split('-')[0]; // e.g. rapidapi-cheapest -> rapidapi
+    let enabled = cfg.providerEnabled?.[provider] ?? (this.config.providerEnabled && this.config.providerEnabled[provider]);
+    if (enabled === undefined) {
+      enabled = cfg.providerEnabled?.[baseName] ?? (this.config.providerEnabled && this.config.providerEnabled[baseName]);
+    }
     if (enabled === false) {
       return { ok: false, reason: DENY.DISABLED, ...base };
     }

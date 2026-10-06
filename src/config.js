@@ -52,7 +52,7 @@ export function loadConfig() {
      */
     brightdata: {
       apiKey: process.env.BRIGHTDATA_API_KEY || '',
-      datasetId: process.env.BRIGHTDATA_DATASET_ID || '',
+      datasetId: process.env.BRIGHTDATA_DATASET_ID || 'gd_l1vikfch901nx3by4',
       baseUrl: process.env.BRIGHTDATA_BASE_URL || '',
       timeoutMs: Number(process.env.BRIGHTDATA_TIMEOUT_MS) || 70000,
       snapshotPollMs: Number(process.env.BRIGHTDATA_SNAPSHOT_POLL_MS) || 5000,

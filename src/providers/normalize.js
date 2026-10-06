@@ -105,7 +105,7 @@ export function normalizeProfileShape(raw, { username = null } = {}) {
     followersCount: toCount(firstDefined(item.followers_count, item.followersCount, item.follower_count, item.followers, item.edge_followed_by)),
     followingCount: toCount(firstDefined(item.following_count, item.followingCount, item.follows_count, item.followsCount, item.following, item.edge_follow)),
     postsCount: toCount(firstDefined(item.posts_count, item.postsCount, item.media_count, item.mediaCount, item.edge_owner_to_timeline_media, typeof item.posts === 'number' ? item.posts : undefined)),
-    externalUrl: firstDefined(item.external_url, item.externalUrl, item.website, item.bio_links?.[0]?.url),
+    externalUrl: (() => { const e = firstDefined(item.external_url, item.externalUrl, item.website, item.bio_links?.[0]?.url); return Array.isArray(e) ? e[0] : e; })(),
     isPrivate: !!firstDefined(item.is_private, item.isPrivate, item.private, false),
     verified: !!firstDefined(item.is_verified, item.isVerified, item.verified, false),
     profilePicUrl: firstDefined(
@@ -130,9 +130,10 @@ export function normalizePosts(list) {
       const displayUrl = firstDefined(
         p.displayUrl, p.display_url, p.imageUrl, p.image_url, p.thumbnail_src,
         p.media_url, p.url, Array.isArray(p.images) ? p.images[0] : undefined,
-        p.image_versions2?.candidates?.[0]?.url
+        p.image_versions2?.candidates?.[0]?.url,
+        p.post_url
       );
-      const timestamp = toIso(firstDefined(p.timestamp, p.taken_at, p.taken_at_timestamp, p.created_at, p.date));
+      const timestamp = toIso(firstDefined(p.timestamp, p.taken_at, p.taken_at_timestamp, p.created_at, p.date, p.datetime));
       const id = firstDefined(p.id, p.pk, shortcode, timestamp && displayUrl ? `${timestamp}-${displayUrl}` : undefined);
       if (!id) return null;
 

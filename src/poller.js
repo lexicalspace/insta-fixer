@@ -30,7 +30,18 @@ export const TASK = {
  */
 export function providerOffers(stack, feature) {
   const list = stack?.providers || stack?.router?.providers || [];
-  return list.some((p) => p.enabled && p.supports(feature));
+  const cfg = stack?.costManager?.repo?.store?.getConfig() || {};
+  const staticCfg = stack?.costManager?.config?.providerEnabled || {};
+  
+  return list.some((p) => {
+    if (!p.enabled || !p.supports(feature)) return false;
+    const baseName = p.name.split('-')[0];
+    let dynEnabled = cfg.providerEnabled?.[p.name] ?? staticCfg[p.name];
+    if (dynEnabled === undefined) {
+      dynEnabled = cfg.providerEnabled?.[baseName] ?? staticCfg[baseName];
+    }
+    return dynEnabled !== false;
+  });
 }
 
 function sha8(buffer) {

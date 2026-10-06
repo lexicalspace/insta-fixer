@@ -608,6 +608,8 @@ export async function main() {
   const config = loadConfig();
   initLogger(config.dataDir);
   wrapConsole();
+
+
   
   const useSupabase = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
   
@@ -622,6 +624,12 @@ export async function main() {
     });
   } else {
     store = new Store(config.dataDir);
+  }
+
+  const cfg = store.getConfig();
+  if (cfg.lastPollStatus === 'running') {
+    store.setConfig({ lastPollStatus: 'error', lastPollError: 'Server restarted while polling.' });
+    try { (await import('fs')).unlinkSync((await import('path')).join(config.dataDir, 'poll.lock')); } catch {}
   }
 
   try {
