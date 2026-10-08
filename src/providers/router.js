@@ -1,3 +1,4 @@
+import { logApiError } from "../logger.js";
 import { TIER_ORDER, ERROR_KIND, ProviderError, toProviderError } from './provider-interface.js';
 
 /**
@@ -154,6 +155,7 @@ export class ProviderRouter {
         return { ...res, provider: cand.name, units: spent, attempts };
       } catch (rawErr) {
         const err = toProviderError(rawErr, cand.name);
+        logApiError(cand.name, username, err, feature);
         this.costManager.record(cand.name, feature, {
           // A failed call may still have burned quota (rate limit, partial run).
           units: err.kind === ERROR_KIND.RATE_LIMIT || err.kind === ERROR_KIND.QUOTA ? 0 : 1,

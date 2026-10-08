@@ -1072,6 +1072,17 @@ async function renderSpherePage() {
         <button id="refresh-logs-btn" class="btn-pill btn-secondary !py-1.5 !px-4 text-sm">Refresh Logs</button>
       </div>
     </section>
+
+    <!-- API Errors Section -->
+    <section class="card p-6 mb-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold capitalize text-[#1a1a1a] dark:text-white">API Errors</h2>
+      </div>
+      <div class="bg-[#1a222c] text-[#ff5530] p-4 rounded-lg font-mono text-xs h-64 overflow-y-auto whitespace-pre-wrap" id="api-errors-console">Loading API errors...</div>
+      <div class="mt-3 flex justify-end">
+        <button id="refresh-api-errors-btn" class="btn-pill btn-secondary !py-1.5 !px-4 text-sm">Refresh Errors</button>
+      </div>
+    </section>
 `;
 
   app.querySelectorAll('.save-api-cfg').forEach(btn => {
@@ -1153,6 +1164,33 @@ async function renderSpherePage() {
   
   loadLogMonths();
 
+  const apiErrorsConsole = document.getElementById('api-errors-console');
+  const refreshApiErrorsBtn = document.getElementById('refresh-api-errors-btn');
+
+  async function loadApiErrors() {
+    if (!apiErrorsConsole) return;
+    try {
+      apiErrorsConsole.textContent = 'Loading API errors...';
+      const res = await fetch('/api/errors');
+      if (res.ok) {
+        const errors = await res.json();
+        if (errors.length === 0) {
+          apiErrorsConsole.textContent = 'No recent API errors.';
+        } else {
+          apiErrorsConsole.textContent = errors.map(e => `[${new Date(e.timestamp).toLocaleString()}] ${e.provider} - ${e.feature} (for ${e.username})\n${e.error}\n`).join('\n');
+        }
+        apiErrorsConsole.scrollTop = apiErrorsConsole.scrollHeight;
+      }
+    } catch (err) {
+      apiErrorsConsole.textContent = 'Error loading API errors: ' + err.message;
+    }
+  }
+
+  if (refreshApiErrorsBtn) {
+    refreshApiErrorsBtn.addEventListener('click', loadApiErrors);
+  }
+
+  loadApiErrors();
 }
 
 async function renderConfigPage() {

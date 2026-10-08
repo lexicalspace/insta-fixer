@@ -70,3 +70,15 @@ export function wrapConsole() {
     writeLog('error', args.join(' '));
   };
 }
+
+export const apiErrors = [];
+export function logApiError(provider, username, error, feature) {
+  apiErrors.unshift({
+    timestamp: new Date().toISOString(),
+    provider,
+    username,
+    feature,
+    error: error.message || String(error)
+  });
+  if (apiErrors.length > 500) apiErrors.length = 500;
+}

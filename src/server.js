@@ -665,6 +665,11 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   });
 
   
+  
+  app.get('/api/errors', requireAuth, async (req, res) => {
+    const logger = await import('./logger.js');
+    res.json(logger.apiErrors);
+  });
   app.get('/api/logs', requireAuth, (req, res) => {
     import('./logger.js').then(logger => {
       res.json(logger.listLogMonths());

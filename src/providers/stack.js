@@ -39,6 +39,16 @@ export function createStack(store, config, { runner = null, storiesFetcher = nul
   const rapidApiKey = config.rapidapi?.key;
   const rapidProviders = rapidApiKey ? [
     {
+      name: 'rapidapi',
+      key: config.rapidapi.key,
+      host: config.rapidapi.host,
+      profilePath: config.rapidapi.profilePath,
+      storiesPath: config.rapidapi.storiesPath,
+      highlightsPath: config.rapidapi.highlightsPath,
+      usernameParam: config.rapidapi.usernameParam,
+      features: [FEATURE.PROFILE, FEATURE.STORIES]
+    },
+    {
       name: 'rapidapi-moadnaciri02',
       key: rapidApiKey,
       host: 'instagram-profile-data-scraper.p.rapidapi.com',
