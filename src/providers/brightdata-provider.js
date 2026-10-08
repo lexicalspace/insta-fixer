@@ -64,35 +64,47 @@ export class BrightDataProvider extends InstagramProvider {
       throw new ProviderError('BRIGHTDATA_DATASET_ID is not set', { kind: ERROR_KIND.AUTH, provider: this.name });
     }
 
-    const input = usernames.map((u) => ({ url: `https://www.instagram.com/${u}/` }));
+    const results = [];
     const query = qs({ dataset_id: this.bd.datasetId, format: 'json', include_errors: 'true' });
 
-    const res = await this.fetcher(`${this.base}/datasets/v3/scrape${query}`, {
-      method: 'POST',
-      headers: this.headers,
-      body: { input },
-      timeoutMs: this.bd.timeoutMs || 70000,
-    });
+    for (let i = 0; i < usernames.length; i++) {
+      if (i > 0) {
+        console.log(`[brightdata] waiting 30s for rate limit (2 req/min)...`);
+        await sleep(30000); // 2 requests per minute = 1 request every 30 seconds
+      }
+      const u = usernames[i];
+      const input = [{ url: `https://www.instagram.com/${u}/` }];
+      const res = await this.fetcher(`${this.base}/datasets/v3/scrape${query}`, {
+        method: 'POST',
+        headers: this.headers,
+        body: { input },
+        timeoutMs: this.bd.timeoutMs || 70000,
+      });
 
-    // 202 means the run outlived the synchronous window; switch to polling.
-    if (res.status === 202) {
-      const snapshotId = parseJson(res.text, res.status)?.snapshot_id;
-      if (!snapshotId) {
-        const err = new Error(`brightdata returned 202 without a snapshot_id: ${res.text.slice(0, 200)}`);
-        err.status = 202;
+      if (res.status === 202) {
+        const snapshotId = parseJson(res.text, res.status)?.snapshot_id;
+        if (!snapshotId) {
+          const err = new Error(`brightdata returned 202 without a snapshot_id: ${res.text.slice(0, 200)}`);
+          err.status = 202;
+          throw err;
+        }
+        const data = await this.waitForSnapshot(snapshotId);
+        results.push(...data);
+        continue;
+      }
+
+      if (!res.ok) {
+        const err = new Error(`brightdata scrape failed (${res.status}): ${res.text.slice(0, 300)}`);
+        err.status = res.status;
         throw err;
       }
-      return this.waitForSnapshot(snapshotId);
-    }
 
-    if (!res.ok) {
-      const err = new Error(`brightdata scrape failed (${res.status}): ${res.text.slice(0, 300)}`);
-      err.status = res.status;
-      throw err;
+      results.push(...asRecords(parseJson(res.text, res.status)));
     }
-
-    return asRecords(parseJson(res.text, res.status));
+    return results;
   }
+
+  // collect_old removed
 
   /**
    * Polls a snapshot until it holds data. The download endpoint answers 202

@@ -44,17 +44,31 @@ export class ApifyProvider extends InstagramProvider {
 
   async getProfile(username, { resultsLimit = 20, usernames = null } = {}) {
     const targets = usernames || [username];
-    const input = {
-      directUrls: targets.map((u) => `https://www.instagram.com/${u}/`),
-      resultsType: 'details',
-      resultsLimit,
-    };
+    const chunkSize = 10;
+    let allRaw = [];
+    let totalUnits = 0;
+    
     try {
-      const raw = await this.runner(this.config.apifyActor, input, this.config.apifyToken);
-      const units = ApifyProvider.countUnits(raw);
+      for (let i = 0; i < targets.length; i += chunkSize) {
+        const chunk = targets.slice(i, i + chunkSize);
+        const input = {
+          directUrls: chunk.map((u) => `https://www.instagram.com/${u}/`),
+          resultsType: 'details',
+          resultsLimit,
+        };
+        const raw = await this.runner(this.config.apifyActor, input, this.config.apifyToken);
+        const units = ApifyProvider.countUnits(raw);
+        totalUnits += units;
+        if (Array.isArray(raw)) {
+          allRaw.push(...raw);
+        } else {
+          allRaw.push(raw);
+        }
+      }
+      
       // Batch mode (privacy ping): hand back raw items, no normalization.
-      if (usernames) return providerResult(Array.isArray(raw) ? raw : [raw], { units, provider: this.name, feature: FEATURE.PROFILE, raw });
-      return providerResult(normalizeProfile(raw), { units, provider: this.name, feature: FEATURE.PROFILE, raw });
+      if (usernames) return providerResult(allRaw, { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
+      return providerResult(normalizeProfile(allRaw), { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
     } catch (err) {
       throw toProviderError(err, this.name);
     }
