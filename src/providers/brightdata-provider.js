@@ -64,43 +64,57 @@ export class BrightDataProvider extends InstagramProvider {
       throw new ProviderError('BRIGHTDATA_DATASET_ID is not set', { kind: ERROR_KIND.AUTH, provider: this.name });
     }
 
-    const results = [];
+    if (usernames.length > 1) {
+      // User requirement: "only one for per account by bright data"
+      // Batch requests must be routed to a provider that supports batching (like Apify).
+      const err = new ProviderError('brightdata only supports 1 profile per call, batching disabled', { kind: ERROR_KIND.RATE_LIMIT, provider: this.name });
+      err.retryable = true;
+      throw err;
+    }
+
+    const u = usernames[0];
+    const input = [{ url: `https://www.instagram.com/${u}/` }];
     const query = qs({ dataset_id: this.bd.datasetId, format: 'json', include_errors: 'true' });
 
-    for (let i = 0; i < usernames.length; i++) {
-      if (i > 0) {
-        console.log(`[brightdata] waiting 30s for rate limit (2 req/min)...`);
-        await sleep(30000); // 2 requests per minute = 1 request every 30 seconds
-      }
-      const u = usernames[i];
-      const input = [{ url: `https://www.instagram.com/${u}/` }];
-      const res = await this.fetcher(`${this.base}/datasets/v3/scrape${query}`, {
-        method: 'POST',
-        headers: this.headers,
-        body: { input },
-        timeoutMs: this.bd.timeoutMs || 70000,
-      });
+    // Enforce 2 requests per minute limit globally for Bright Data by checking last call time
+    // Note: The router's cost manager doesn't track timestamp precision for sleep, so we sleep if needed.
+    const now = Date.now();
+    const lastCall = this._lastCallMs || 0;
+    const elapsed = now - lastCall;
+    if (elapsed < 30000) {
+      const wait = 30000 - elapsed;
+      console.log(`[brightdata] waiting ${Math.round(wait / 1000)}s for rate limit (2 req/min)...`);
+      await sleep(wait);
+    }
+    this._lastCallMs = Date.now();
 
-      if (res.status === 202) {
-        const snapshotId = parseJson(res.text, res.status)?.snapshot_id;
-        if (!snapshotId) {
-          const err = new Error(`brightdata returned 202 without a snapshot_id: ${res.text.slice(0, 200)}`);
-          err.status = 202;
-          throw err;
-        }
-        const data = await this.waitForSnapshot(snapshotId);
-        results.push(...data);
-        continue;
-      }
+    const results = [];
+    const res = await this.fetcher(`${this.base}/datasets/v3/scrape${query}`, {
+      method: 'POST',
+      headers: this.headers,
+      body: { input },
+      timeoutMs: this.bd.timeoutMs || 70000,
+    });
 
-      if (!res.ok) {
-        const err = new Error(`brightdata scrape failed (${res.status}): ${res.text.slice(0, 300)}`);
-        err.status = res.status;
+    if (res.status === 202) {
+      const snapshotId = parseJson(res.text, res.status)?.snapshot_id;
+      if (!snapshotId) {
+        const err = new Error(`brightdata returned 202 without a snapshot_id: ${res.text.slice(0, 200)}`);
+        err.status = 202;
         throw err;
       }
-
-      results.push(...asRecords(parseJson(res.text, res.status)));
+      const data = await this.waitForSnapshot(snapshotId);
+      results.push(...data);
+      return results;
     }
+
+    if (!res.ok) {
+      const err = new Error(`brightdata scrape failed (${res.status}): ${res.text.slice(0, 300)}`);
+      err.status = res.status;
+      throw err;
+    }
+
+    results.push(...asRecords(parseJson(res.text, res.status)));
     return results;
   }
 

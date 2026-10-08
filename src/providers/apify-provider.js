@@ -67,6 +67,12 @@ export class ApifyProvider extends InstagramProvider {
         }
       }
       
+      if (usernames) {
+        const normalized = allRaw.map(r => {
+          try { return normalizeProfile(r); } catch (err) { return null; }
+        }).filter(Boolean);
+        return providerResult(normalized, { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
+      }
       const normalized = normalizeProfile(allRaw);
       return providerResult(normalized, { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
     } catch (err) {

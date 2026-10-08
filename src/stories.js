@@ -65,6 +65,7 @@ export async function fetchStories(username, config) {
   const actor = config.storiesActor;
   const input = {
     username,
+    usernames: [username],
     includeStories: true,
     includeHighlights: true,
     maxItems: 50,

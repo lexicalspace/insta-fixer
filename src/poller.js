@@ -301,7 +301,7 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
 
   const stories = [];
   const storyChanged = [];
-  const shouldFetchStories = want(TASK.STORIES) || profile.hasStory;
+  const shouldFetchStories = want(TASK.PROFILE) ? profile.hasStory : want(TASK.STORIES);
   if (!isPrivate && entry.trackStories && shouldFetchStories && providerOffers(stack, FEATURE.STORIES)) {
     try {
       const storyRes = await router.call(FEATURE.STORIES, {
@@ -441,13 +441,17 @@ export async function poll(store, config, { force = false, runner = runActorSync
     const due = pDue || sDue;
 
     if (!due) {
-      results.push({
-        username: entry.username,
-        ok: true,
-        due: false,
-        throttleFactor: throttle,
-        nextPollAt: nextPollFor(entry, config, throttle),
-      });
+      if (entry.isPrivate && isDue(entry, config, now, throttle)) {
+        pendingPings.push(entry);
+      } else {
+        results.push({
+          username: entry.username,
+          ok: true,
+          due: false,
+          throttleFactor: throttle,
+          nextPollAt: nextPollFor(entry, config, throttle),
+        });
+      }
       continue;
     }
 
