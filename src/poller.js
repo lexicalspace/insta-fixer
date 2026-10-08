@@ -232,14 +232,22 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
   const prev = prevList.length ? prevList[prevList.length - 1] : null;
 
   let profile;
+  let resultProvider = null;
   if (want(TASK.PROFILE)) {
-    const res = await router.call(FEATURE.PROFILE, {
-      username,
-      args: { resultsLimit: MAX_POST_MEDIA },
-      priority: PRIORITY.NORMAL,
-      allowedProviders: entry.allowedProviders,
-    });
-    profile = res.data;
+    if (stack.profileCache && stack.profileCache.has(username)) {
+      const cached = stack.profileCache.get(username);
+      profile = cached.data;
+      resultProvider = cached.provider;
+    } else {
+      const res = await router.call(FEATURE.PROFILE, {
+        username,
+        args: { resultsLimit: MAX_POST_MEDIA },
+        priority: PRIORITY.NORMAL,
+        allowedProviders: entry.allowedProviders,
+      });
+      profile = res.data;
+      resultProvider = res.provider;
+    }
   } else {
     profile = prev ? prev.profile : { isPrivate: entry.isPrivate };
   }
@@ -257,6 +265,7 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
       allowedProviders: entry.allowedProviders,
     });
     profile = backfill.data;
+    resultProvider = backfill.provider;
   }
 
   if (isPrivate !== entry.isPrivate) {
@@ -265,7 +274,7 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
 
   let profilePicFile = prev?.profile?.profilePicFile ?? null;
   if (want(TASK.AVATAR)) {
-    if (result.provider === 'brightdata' && profilePicFile) {
+    if (resultProvider === 'brightdata' && profilePicFile) {
       // Ignore avatar updates from brightdata to avoid false positives (low-res vs HD mismatch)
     } else if (profile.profilePicUrl) {
       const dl = await downloadTo(store, username, profile.profilePicUrl, 'avatar');
@@ -397,6 +406,34 @@ export async function poll(store, config, { force = false, runner = runActorSync
   let pingCount = 0;
 
   const pendingPings = [];
+
+  // Prefetch profiles in batches to optimize API calls (e.g. Apify 10-account chunks)
+  const profileCache = new Map();
+  ctx.profileCache = profileCache;
+  const dueEntries = profiles.filter(e => force || isDue(e, config, now, throttle));
+  
+  if (dueEntries.length > 1) {
+    const batched = [];
+    for (let i = 0; i < dueEntries.length; i += 10) {
+      const batch = dueEntries.slice(i, i + 10);
+      try {
+        const res = await ctx.router.call(FEATURE.PROFILE, {
+          username: batch[0].username,
+          args: { usernames: batch.map(e => e.username), resultsLimit: MAX_POST_MEDIA },
+          priority: PRIORITY.NORMAL,
+          allowedProviders: batch[0].allowedProviders,
+        });
+        const items = Array.isArray(res.data) ? res.data : [res.data];
+        for (const item of items) {
+          if (item && !item.noResults && item.username) {
+            profileCache.set(item.username, { data: item, provider: res.provider, units: res.units });
+          }
+        }
+      } catch (err) {
+        console.warn(`[poller] batched prefetch failed: ${err.message}`);
+      }
+    }
+  }
 
   for (const entry of profiles) {
     const pDue = force || isDue(entry, config, now, throttle);
