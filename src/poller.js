@@ -413,24 +413,32 @@ export async function poll(store, config, { force = false, runner = runActorSync
   const dueEntries = profiles.filter(e => force || isDue(e, config, now, throttle));
   
   if (dueEntries.length > 1) {
-    const batched = [];
-    for (let i = 0; i < dueEntries.length; i += 10) {
-      const batch = dueEntries.slice(i, i + 10);
-      try {
-        const res = await ctx.router.call(FEATURE.PROFILE, {
-          username: batch[0].username,
-          args: { usernames: batch.map(e => e.username), resultsLimit: MAX_POST_MEDIA },
-          priority: PRIORITY.NORMAL,
-          allowedProviders: batch[0].allowedProviders,
-        });
-        const items = Array.isArray(res.data) ? res.data : [res.data];
-        for (const item of items) {
-          if (item && !item.noResults && item.username) {
-            profileCache.set(item.username, { data: item, provider: res.provider, units: res.units });
+    const groups = new Map();
+    for (const entry of dueEntries) {
+      const key = entry.allowedProviders ? entry.allowedProviders.slice().sort().join(',') : 'ALL';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(entry);
+    }
+
+    for (const group of groups.values()) {
+      for (let i = 0; i < group.length; i += 10) {
+        const batch = group.slice(i, i + 10);
+        try {
+          const res = await ctx.router.call(FEATURE.PROFILE, {
+            username: batch[0].username,
+            args: { usernames: batch.map(e => e.username), resultsLimit: MAX_POST_MEDIA },
+            priority: PRIORITY.NORMAL,
+            allowedProviders: batch[0].allowedProviders,
+          });
+          const items = Array.isArray(res.data) ? res.data : [res.data];
+          for (const item of items) {
+            if (item && !item.noResults && item.username) {
+              profileCache.set(item.username, { data: item, provider: res.provider, units: res.units });
+            }
           }
+        } catch (err) {
+          console.warn(`[poller] batched prefetch failed: ${err.message}`);
         }
-      } catch (err) {
-        console.warn(`[poller] batched prefetch failed: ${err.message}`);
       }
     }
   }
@@ -574,17 +582,32 @@ function nextPollFor(entry, config, throttle, fallbackAt = null) {
  * to a costlier provider. Returns Map<username, { isPrivate }>.
  */
 async function pingPrivateAccounts(store, config, entries, stack) {
-  const res = await stack.router.call(FEATURE.PROFILE, {
-    username: entries[0]?.username,
-    args: { usernames: entries.map((e) => e.username), resultsLimit: Math.max(entries.length, 1) },
-    priority: PRIORITY.LOW,
-    units: Math.max(entries.length, 1), // one dataset item per account, not a full scrape
-  });
-  const items = Array.isArray(res.data) ? res.data : [res.data];
   const map = new Map();
-  for (const item of items) {
-    if (!item || item.noResults || !item.username) continue;
-    map.set(item.username, { isPrivate: !!(item.private || item.isPrivate) });
+  const groups = new Map();
+  
+  for (const entry of entries) {
+    const key = entry.allowedProviders ? entry.allowedProviders.slice().sort().join(',') : 'ALL';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+
+  for (const group of groups.values()) {
+    try {
+      const res = await stack.router.call(FEATURE.PROFILE, {
+        username: group[0].username,
+        args: { usernames: group.map((e) => e.username), resultsLimit: Math.max(group.length, 1) },
+        priority: PRIORITY.LOW,
+        units: Math.max(group.length, 1), // one dataset item per account, not a full scrape
+        allowedProviders: group[0].allowedProviders,
+      });
+      const items = Array.isArray(res.data) ? res.data : [res.data];
+      for (const item of items) {
+        if (!item || item.noResults || !item.username) continue;
+        map.set(item.username, { isPrivate: !!(item.private || item.isPrivate) });
+      }
+    } catch (err) {
+      // If batch fails, we'll try individually in the unhandled loop
+    }
   }
 
   // Fallback for providers like RapidAPI that don't support batching and only return the first username.
@@ -596,6 +619,7 @@ async function pingPrivateAccounts(store, config, entries, stack) {
         username: entry.username,
         priority: PRIORITY.LOW,
         units: 0,
+        allowedProviders: entry.allowedProviders,
       });
       const uItem = uRes.data;
       if (uItem && !uItem.noResults && uItem.username) {
