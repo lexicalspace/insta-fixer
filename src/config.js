@@ -12,7 +12,7 @@ export function loadConfig() {
     pollToken: process.env.POLL_TOKEN || 'dev-poll-token',
     apifyToken: process.env.APIFY_TOKEN || '',
     apifyActor: process.env.APIFY_ACTOR || 'apify/instagram-scraper',
-    storiesActor: process.env.APIFY_STORIES_ACTOR || '',
+    storiesActor: (process.env.APIFY_STORIES_ACTOR === 'apify/instagram-story-scraper' ? 'oneary/instagram-stories-and-highlights-scraper' : process.env.APIFY_STORIES_ACTOR) || '',
     storiesToken: process.env.APIFY_STORIES_TOKEN || '',
     storiesProxy: process.env.APIFY_STORIES_PROXY || '',
     instagramSession: process.env.INSTAGRAM_SESSION || '',
