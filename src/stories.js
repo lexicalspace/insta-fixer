@@ -60,12 +60,13 @@ export function stableStoryId(item, mediaUrl) {
  * Returns [] when no stories actor is configured or nothing is found.
  */
 export async function fetchStories(username, config) {
+  const targetUsernames = Array.isArray(username) ? username : [username];
   if (!config.storiesActor) return [];
 
   const actor = config.storiesActor;
   const input = {
-    username,
-    usernames: [username],
+    username: targetUsernames[0],
+    usernames: targetUsernames,
     includeStories: true,
     includeHighlights: true,
     maxItems: 50,
@@ -106,6 +107,15 @@ export async function fetchStories(username, config) {
       highlightTitle: item.highlightTitle || item.highlight_title || null,
       caption: item.caption || null,
       type: item.mediaType || item.type || null,
+            username: (() => {
+        const pu = item.profileUsername || '';
+        if (pu) {
+          for (const u of targetUsernames) {
+            if (pu === u || pu.startsWith(u + "'s highlight")) return u;
+          }
+        }
+        return item.ownerUsername || item.user?.username || item.username || targetUsernames[0];
+      })(),
     });
   }
   return out;

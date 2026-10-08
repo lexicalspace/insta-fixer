@@ -85,9 +85,10 @@ export class ApifyProvider extends InstagramProvider {
       return providerResult([], { units: 0, provider: this.name, feature: FEATURE.STORIES });
     }
     try {
-      const stories = await this.storiesFetcher(username, this.config);
+      const targetUsernames = opts.usernames || [username];
+      const stories = await this.storiesFetcher(targetUsernames, this.config);
       return providerResult(stories, {
-        units: Math.max(1, stories.length),
+        units: Math.max(1, targetUsernames.length),
         provider: this.name,
         feature: FEATURE.STORIES,
       });

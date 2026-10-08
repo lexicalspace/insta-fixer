@@ -304,13 +304,19 @@ export async function pollProfile(store, config, entry, stack, { tasks = null } 
   const shouldFetchStories = want(TASK.PROFILE) ? profile.hasStory : want(TASK.STORIES);
   if (!isPrivate && entry.trackStories && shouldFetchStories && providerOffers(stack, FEATURE.STORIES)) {
     try {
-      const storyRes = await router.call(FEATURE.STORIES, {
-        username,
-        args: { maxItems: 20 },
-        priority: PRIORITY.LOW,
-        allowedProviders: entry.allowedProviders,
-      });
-      const fresh = filterNewStories(storyRes.data || [], entry.seenStories);
+      let storyData = [];
+      if (ctx.storyCache && ctx.storyCache.has(username)) {
+        storyData = ctx.storyCache.get(username).data;
+      } else {
+        const storyRes = await router.call(FEATURE.STORIES, {
+          username,
+          args: { usernames: [username], maxItems: 20 },
+          priority: PRIORITY.LOW,
+          allowedProviders: entry.allowedProviders,
+        });
+        storyData = storyRes.data || [];
+      }
+      const fresh = filterNewStories(storyData, entry.seenStories);
       const newOnes = [];
       for (const s of fresh.slice(0, 20)) {
         const mediaFile = await downloadTo(store, username, s.mediaUrl, 'story');
@@ -410,6 +416,8 @@ export async function poll(store, config, { force = false, runner = runActorSync
   // Prefetch profiles in batches to optimize API calls (e.g. Apify 10-account chunks)
   const profileCache = new Map();
   ctx.profileCache = profileCache;
+  const storyCache = new Map();
+  ctx.storyCache = storyCache;
   const dueEntries = profiles.filter(e => force || isDue(e, config, now, throttle));
   
   if (dueEntries.length > 1) {
@@ -441,6 +449,39 @@ export async function poll(store, config, { force = false, runner = runActorSync
         }
       }
     }
+    const storyGroups = new Map();
+    for (const entry of dueEntries) {
+      if (entry.trackStories && (force || isStoryDue(entry, config, now, throttle))) {
+        const key = entry.allowedProviders ? entry.allowedProviders.slice().sort().join(',') : 'ALL';
+        if (!storyGroups.has(key)) storyGroups.set(key, []);
+        storyGroups.get(key).push(entry);
+      }
+    }
+
+    for (const group of storyGroups.values()) {
+      for (let i = 0; i < group.length; i += 8) {
+        const batch = group.slice(i, i + 8);
+        try {
+          const res = await ctx.router.call(FEATURE.STORIES, {
+            username: batch[0].username,
+            args: { usernames: batch.map(e => e.username), maxItems: 20 },
+            priority: PRIORITY.LOW,
+            allowedProviders: batch[0].allowedProviders,
+          });
+          const items = Array.isArray(res.data) ? res.data : [res.data];
+          for (const item of items) {
+            const u = item.username;
+            if (u) {
+              if (!storyCache.has(u)) storyCache.set(u, { data: [], provider: res.provider, units: res.units });
+              storyCache.get(u).data.push(item);
+            }
+          }
+        } catch (err) {
+          console.warn(`[poller] batched stories prefetch failed: ${err.message}`);
+        }
+      }
+    }
+
   }
 
   for (const entry of profiles) {
