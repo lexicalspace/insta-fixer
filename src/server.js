@@ -558,6 +558,7 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   app.get("/api/media/user/:username", requireAuth, async (req, res) => {
     const items = [];
     const username = req.params.username;
+    const visibleUsers = new Set(getVisibleProfiles(req).map(p => p.username));
     try {
       for (const f of await store.listMedia(username)) {
         if (!isSafeMediaPath(f.username, f.name)) continue;

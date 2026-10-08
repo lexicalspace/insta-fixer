@@ -53,6 +53,7 @@ export class ApifyProvider extends InstagramProvider {
         const chunk = targets.slice(i, i + chunkSize);
         const input = {
           directUrls: chunk.map((u) => `https://www.instagram.com/${u}/`),
+          username: chunk,
           resultsType: 'details',
           resultsLimit,
         };
@@ -66,9 +67,8 @@ export class ApifyProvider extends InstagramProvider {
         }
       }
       
-      // Batch mode (privacy ping): hand back raw items, no normalization.
-      if (usernames) return providerResult(allRaw, { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
-      return providerResult(normalizeProfile(allRaw), { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
+      const normalized = normalizeProfile(allRaw);
+      return providerResult(normalized, { units: totalUnits, provider: this.name, feature: FEATURE.PROFILE, raw: allRaw });
     } catch (err) {
       throw toProviderError(err, this.name);
     }

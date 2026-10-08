@@ -143,10 +143,12 @@ export class BrightDataProvider extends InstagramProvider {
       const records = await this.collect(targets);
       const units = Math.max(1, records.length);
 
-      // Batch mode mirrors ApifyProvider: hand back raw records untouched so the
-      // privacy ping can map them itself.
+      // Batch mode was modified to normalize all records.
       if (usernames) {
-        return providerResult(records, { units, provider: this.name, feature: FEATURE.PROFILE, raw: records });
+        const normalized = records.map(r => {
+          try { return normalizeProfileShape([r], { username: r.username || r.account }); } catch { return null; }
+        }).filter(Boolean);
+        return providerResult(normalized, { units, provider: this.name, feature: FEATURE.PROFILE, raw: records });
       }
 
       // Bright Data echoes an error record instead of 404 for a dead account.
