@@ -35,7 +35,26 @@ export function createApp({ config = loadConfig(), store = new Store(config.data
   const app = express();
   app.use(express.json());
 
-  const syncDebouncer = createSyncDebouncer(config, store);
+  const syncDebouncer = createSyncDebouncer(config, store, {
+    sync: async (s, c) => {
+      let r = { ok: true, errors: [] };
+      if (hfEnabled(c)) {
+        r = await syncToHF(s, c);
+      } else {
+        r = { ok: false, skipped: true, errors: ['HF not configured'] };
+      }
+      
+      if (isBucketConfigured()) {
+        try {
+          const ok = await syncToBucket(s.dataDir || s.dir);
+          if (!ok) r.errors.push('Bucket sync failed');
+        } catch (err) {
+          r.errors.push(`Bucket sync error: ${err.message}`);
+        }
+      }
+      return r;
+    }
+  });
   store.onChange(() => syncDebouncer.schedule());
   app.syncDebouncer = syncDebouncer;
 
